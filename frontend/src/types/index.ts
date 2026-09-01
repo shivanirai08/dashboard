@@ -64,3 +64,16 @@ export type Activity = {
 };
 
 export type DataMode = "loading" | "ready" | "empty" | "error";
+
+export type Customer = {
+  id: string;
+  name: string;
+  phone: string;
+  email: string;
+  zone: string;
+  bookingsCount: number;
+  totalSpent: number;
+  lastBooking: { id: string; service: string; date: string };
+  vehicles: string[];
+  joinedAt: string;
+};

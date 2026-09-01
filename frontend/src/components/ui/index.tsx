@@ -283,3 +283,31 @@ export function GhostButton({
     </button>
   );
 }
+
+export function Initials({
+  name,
+  size = "md",
+  tone = "neutral",
+}: {
+  name: string;
+  size?: "sm" | "md" | "lg";
+  tone?: "neutral" | "accent";
+}) {
+  const parts = name.split(" ");
+  const letters = (parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "");
+  const dims =
+    size === "lg" ? "h-11 w-11 text-[13px]" : size === "sm" ? "h-7 w-7 text-[11px]" : "h-9 w-9 text-xs";
+  return (
+    <span
+      className={
+        "inline-flex shrink-0 items-center justify-center rounded-full font-semibold " +
+        dims +
+        (tone === "accent"
+          ? " bg-accent-soft text-accent"
+          : " bg-surface-3 text-muted ring-1 ring-border")
+      }
+    >
+      {letters.toUpperCase()}
+    </span>
+  );
+}

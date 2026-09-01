@@ -313,6 +313,62 @@ export const activity: Activity[] = [
   },
 ];
 
+function buildCustomers() {
+  const map = new Map<
+    string,
+    {
+      name: string;
+      phone: string;
+      zone: string;
+      bookingsCount: number;
+      totalSpent: number;
+      vehicles: Set<string>;
+      lastBooking: { id: string; service: string; date: string };
+      joinedAt: string;
+    }
+  >();
+
+  for (const b of bookings) {
+    const key = `${b.customer}|${b.phone}`;
+    const existing = map.get(key);
+    if (!existing) {
+      map.set(key, {
+        name: b.customer,
+        phone: b.phone,
+        zone: b.location,
+        bookingsCount: 1,
+        totalSpent: b.amount,
+        vehicles: new Set([b.vehicle]),
+        lastBooking: { id: b.id, service: b.service, date: b.date },
+        joinedAt: b.date,
+      });
+    } else {
+      existing.bookingsCount += 1;
+      existing.totalSpent += b.amount;
+      existing.vehicles.add(b.vehicle);
+      existing.lastBooking = { id: b.id, service: b.service, date: b.date };
+    }
+  }
+
+  const emailSlug = (name: string) =>
+    name.toLowerCase().replace(/\s+/g, ".").replace(/[^a-z.]/g, "");
+
+  return Array.from(map.values()).map((c, i) => ({
+    id: `CUS-${(1000 + i).toString()}`,
+    name: c.name,
+    phone: c.phone,
+    email: `${emailSlug(c.name)}@email.com`,
+    zone: c.zone,
+    bookingsCount: c.bookingsCount,
+    totalSpent: c.totalSpent,
+    lastBooking: c.lastBooking,
+    vehicles: Array.from(c.vehicles),
+    joinedAt: c.joinedAt,
+  }));
+}
+
+export const customers = buildCustomers();
+
 export function money(n: number): string {
   return `$${n.toLocaleString("en-US")}`;
 }
