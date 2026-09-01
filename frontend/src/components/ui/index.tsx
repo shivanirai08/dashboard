@@ -259,3 +259,27 @@ export function PrimaryButton({
     </button>
   );
 }
+
+export function GhostButton({
+  children,
+  onClick,
+  active = false,
+}: {
+  children: ReactNode;
+  onClick?: () => void;
+  active?: boolean;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={
+        "inline-flex h-8 items-center gap-1.5 rounded-lg border px-3 text-xs font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring " +
+        (active
+          ? "border-border-strong bg-surface-3 text-foreground"
+          : "border-border bg-surface text-muted hover:bg-surface-3 hover:text-foreground")
+      }
+    >
+      {children}
+    </button>
+  );
+}
