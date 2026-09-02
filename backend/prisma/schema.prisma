@@ -1,0 +1,107 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum BookingStatus {
+  pending
+  assigned
+  on_the_way
+  completed
+  cancelled
+}
+
+enum MechanicStatus {
+  available
+  on_job
+  offline
+}
+
+model Customer {
+  id        String    @id @default(cuid())
+  name      String
+  phone     String
+  email     String?
+  zone      String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  bookings  Booking[]
+
+  @@index([name])
+  @@index([phone])
+  @@map("customers")
+}
+
+model Mechanic {
+  id            String         @id @default(cuid())
+  name          String
+  phone         String
+  status        MechanicStatus @default(available)
+  zone          String
+  jobsCompleted Int            @default(0)
+  rating        Float          @default(4.5)
+  since         Int
+  specialties   String[]       @default([])
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  bookings      Booking[]
+
+  @@index([status])
+  @@index([zone])
+  @@map("mechanics")
+}
+
+model ServiceCategory {
+  id        String    @id @default(cuid())
+  name      String    @unique
+  basePrice Decimal   @db.Decimal(10, 2)
+  createdAt DateTime  @default(now())
+  bookings  Booking[]
+
+  @@map("service_categories")
+}
+
+model Booking {
+  id            String          @id @default(cuid())
+  bookingNumber String          @unique
+  customerId    String
+  customer      Customer        @relation(fields: [customerId], references: [id])
+  mechanicId    String?
+  mechanic      Mechanic?       @relation(fields: [mechanicId], references: [id])
+  serviceId     String
+  service       ServiceCategory @relation(fields: [serviceId], references: [id])
+  vehicle       String
+  plate         String
+  status        BookingStatus   @default(pending)
+  amount        Decimal         @db.Decimal(10, 2)
+  scheduledAt   DateTime
+  location      String
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  activities    BookingActivity[]
+
+  @@index([status])
+  @@index([scheduledAt])
+  @@index([customerId])
+  @@index([mechanicId])
+  @@map("bookings")
+}
+
+model BookingActivity {
+  id         String         @id @default(cuid())
+  bookingId  String
+  booking    Booking        @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  fromStatus BookingStatus?
+  toStatus   BookingStatus
+  message    String
+  actor      String
+  createdAt  DateTime       @default(now())
+
+  @@index([bookingId])
+  @@index([createdAt])
+  @@map("booking_activities")
+}
