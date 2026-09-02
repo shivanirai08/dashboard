@@ -17,6 +17,14 @@ export const analyticsRepository = {
     });
   },
 
+  groupBookingsByStatusInRange(start: Date, end: Date) {
+    return prisma.booking.groupBy({
+      by: ["status"],
+      where: { scheduledAt: { gte: start, lte: end } },
+      _count: { _all: true },
+    });
+  },
+
   groupBookingsByService(start: Date, end: Date, limit: number) {
     return prisma.booking.groupBy({
       by: ["serviceId"],

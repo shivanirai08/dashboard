@@ -1,6 +1,6 @@
 import { BookingStatus } from "@prisma/client";
 import { prisma } from "./prisma.js";
-import { dayKey, startOfDay } from "./formatters.js";
+import { dayKey, endOfDay, startOfDay } from "./formatters.js";
 
 const MONTHS = [
   "Jan", "Feb", "Mar", "Apr", "May", "Jun",
@@ -8,9 +8,10 @@ const MONTHS = [
 ] as const;
 
 export async function buildBookingSeries(days: number) {
-  const end = startOfDay(new Date());
+  const end = endOfDay(startOfDay(new Date()));
   const start = new Date(end);
   start.setDate(end.getDate() - (days - 1));
+  start.setHours(0, 0, 0, 0);
 
   const bookings = await prisma.booking.findMany({
     where: { scheduledAt: { gte: start, lte: end } },

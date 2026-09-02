@@ -76,7 +76,13 @@ const MechanicStatus = {
 const BATCH_SIZE = 100;
 const CUSTOMER_COUNT = 55;
 const BOOKING_COUNT = 520;
-const SEED_END_DATE = new Date(2026, 1, 14, 18, 0, 0);
+
+/** Anchor seed bookings to "today" so analytics/dashboard date windows match. */
+function seedEndDate(): Date {
+  const d = new Date();
+  d.setHours(18, 0, 0, 0);
+  return d;
+}
 
 function rng(seed: number) {
   let s = seed;
@@ -413,6 +419,7 @@ async function main() {
   console.log("Creating bookings…");
   const randBookings = rng(770419);
   const bookingRows: BookingSeedRow[] = [];
+  const seedEnd = seedEndDate();
 
   for (let index = 0; index < BOOKING_COUNT; index++) {
     const status = pickStatus(randBookings);
@@ -427,8 +434,8 @@ async function main() {
 
     const mechanic = needsMechanic(status) ? pickItem(mechanics, randBookings) : null;
 
-    const scheduledAt = new Date(SEED_END_DATE);
-    scheduledAt.setDate(SEED_END_DATE.getDate() - Math.floor(index / 6));
+    const scheduledAt = new Date(seedEnd);
+    scheduledAt.setDate(seedEnd.getDate() - Math.floor(index / 6));
     scheduledAt.setHours(7 + Math.floor(randBookings() * 13));
     scheduledAt.setMinutes(Math.floor(randBookings() * 4) * 15);
 

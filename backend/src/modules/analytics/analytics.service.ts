@@ -15,7 +15,7 @@ export const analyticsService = {
 
     const [bookingsInRange, statusBreakdown, serviceGroups, series] = await Promise.all([
       analyticsRepository.findBookingsInRange(start, end),
-      analyticsRepository.groupAllBookingsByStatus(),
+      analyticsRepository.groupBookingsByStatusInRange(start, end),
       analyticsRepository.groupBookingsByService(start, end, 8),
       buildBookingSeries(days),
     ]);
