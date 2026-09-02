@@ -10,3 +10,4 @@ bookingsRouter.get("/meta/counts", asyncHandler(bookingsController.getStatusCoun
 bookingsRouter.get("/meta/filters", asyncHandler(bookingsController.getFilters));
 bookingsRouter.get("/:id", asyncHandler(bookingsController.getById));
 bookingsRouter.patch("/:id/reassign", asyncHandler(bookingsController.reassign));
+bookingsRouter.patch("/:id/status", asyncHandler(bookingsController.updateStatus));

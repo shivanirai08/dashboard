@@ -234,9 +234,12 @@ function MechanicsContentInner() {
     if (q !== null) setQuery(q);
   }, [searchParams]);
 
-  const load = useCallback(() => {
-    setLoading(true);
-    setError(false);
+  const load = useCallback((opts?: { silent?: boolean }) => {
+    const silent = Boolean(opts?.silent);
+    if (!silent) {
+      setLoading(true);
+      setError(false);
+    }
     Promise.all([
       api.getMechanics({ q: debouncedQuery || undefined, status: filter }),
       api.getMechanicStatusCounts(),
@@ -244,9 +247,14 @@ function MechanicsContentInner() {
       .then(([list, statusCounts]) => {
         setRows(list.data);
         setCounts(statusCounts);
+        setError(false);
       })
-      .catch(() => setError(true))
-      .finally(() => setLoading(false));
+      .catch(() => {
+        if (!silent) setError(true);
+      })
+      .finally(() => {
+        if (!silent) setLoading(false);
+      });
   }, [debouncedQuery, filter]);
 
   useEffect(() => {

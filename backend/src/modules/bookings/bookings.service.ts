@@ -1,6 +1,8 @@
-import { BookingStatus } from "@prisma/client";
+import { BookingStatus } from "../../lib/enums.js";
 import { ApiError } from "../../middleware/error-handler.js";
 import { formatScheduledDate, mapBooking } from "../../lib/formatters.js";
+import { makeEvent } from "../../realtime/events.js";
+import { broadcast } from "../../realtime/ws.js";
 import {
   bookingsRepository,
   buildBookingOrderBy,
@@ -27,6 +29,73 @@ export type CreateBookingInput = {
 export type ReassignBookingInput = {
   mechanic: string;
 };
+
+export type UpdateStatusInput = {
+  status: string;
+};
+
+const STATUS_LABEL: Record<BookingStatus, string> = {
+  pending: "Pending",
+  assigned: "Assigned",
+  on_the_way: "On the way",
+  completed: "Completed",
+  cancelled: "Cancelled",
+};
+
+const ALLOWED_TRANSITIONS: Record<BookingStatus, BookingStatus[]> = {
+  pending: [BookingStatus.assigned, BookingStatus.cancelled],
+  assigned: [BookingStatus.on_the_way, BookingStatus.cancelled],
+  on_the_way: [BookingStatus.completed, BookingStatus.cancelled],
+  completed: [],
+  cancelled: [],
+};
+
+function isBookingStatus(value: string): value is BookingStatus {
+  return Object.values(BookingStatus).includes(value as BookingStatus);
+}
+
+type BookingActivityRow = {
+  id: string;
+  fromStatus: string | null;
+  toStatus: string;
+  message: string;
+  actor: string;
+  createdAt: Date;
+};
+
+type BookingDetailRow = {
+  scheduledAt: Date;
+  customer: { email: string | null; zone: string | null; name: string; phone: string };
+  activities: BookingActivityRow[];
+} & Parameters<typeof mapBooking>[0];
+
+function mapTimeline(activities: BookingActivityRow[]) {
+  return activities.map((activity) => ({
+    id: activity.id,
+    fromStatus: activity.fromStatus,
+    toStatus: activity.toStatus,
+    message: activity.message,
+    actor: activity.actor,
+    at: activity.createdAt.toISOString(),
+  }));
+}
+
+function statusLabelOf(status: BookingStatus): string {
+  return STATUS_LABEL[status];
+}
+
+function detailPayload(updated: BookingDetailRow) {
+  const { date, time } = formatScheduledDate(updated.scheduledAt);
+  return {
+    ...mapBooking(updated),
+    email: updated.customer.email,
+    zone: updated.customer.zone,
+    timeline: mapTimeline(updated.activities),
+    scheduledAt: updated.scheduledAt.toISOString(),
+    date,
+    time,
+  };
+}
 
 async function nextBookingNumber() {
   const latest = await bookingsRepository.findLatestBookingNumber();
@@ -71,14 +140,7 @@ export const bookingsService = {
       ...mapBooking(booking),
       email: booking.customer.email,
       zone: booking.customer.zone,
-      timeline: booking.activities.map((activity) => ({
-        id: activity.id,
-        fromStatus: activity.fromStatus,
-        toStatus: activity.toStatus,
-        message: activity.message,
-        actor: activity.actor,
-        at: activity.createdAt.toISOString(),
-      })),
+      timeline: mapTimeline(booking.activities as BookingActivityRow[]),
       scheduledAt: booking.scheduledAt.toISOString(),
       date,
       time,
@@ -89,7 +151,7 @@ export const bookingsService = {
     const rows = await bookingsRepository.groupByStatus();
 
     const counts: Record<string, number> = { all: 0 };
-    for (const row of rows) {
+    for (const row of rows as Array<{ status: string; _count: { _all: number } }>) {
       counts[row.status] = row._count._all;
       counts.all += row._count._all;
     }
@@ -103,8 +165,8 @@ export const bookingsService = {
     ]);
 
     return {
-      services: services.map((service) => service.name),
-      mechanics: mechanics.map((mechanic) => mechanic.name),
+      services: (services as Array<{ name: string }>).map((service) => service.name),
+      mechanics: (mechanics as Array<{ name: string }>).map((mechanic) => mechanic.name),
     };
   },
 
@@ -192,7 +254,15 @@ export const bookingsService = {
       },
     });
 
-    return mapBooking(booking);
+    const mapped = mapBooking(booking);
+    broadcast(
+      makeEvent(
+        "booking.created",
+        `${mapped.customer} booked ${mapped.service} · ${mapped.id}`,
+        { id: mapped.id, status: mapped.status, customer: mapped.customer },
+      ),
+    );
+    return mapped;
   },
 
   async reassign(id: string, input: ReassignBookingInput) {
@@ -206,9 +276,9 @@ export const bookingsService = {
       throw new ApiError(400, "Mechanic not found");
     }
 
-    const fromStatus = booking.status;
-    const toStatus =
-      booking.status === BookingStatus.pending ? BookingStatus.assigned : booking.status;
+    const fromStatus = booking.status as BookingStatus;
+    const toStatus: BookingStatus =
+      booking.status === BookingStatus.pending ? BookingStatus.assigned : fromStatus;
 
     const updated = await bookingsRepository.update(booking.id, {
       mechanic: { connect: { id: mechanic.id } },
@@ -223,22 +293,83 @@ export const bookingsService = {
       },
     });
 
-    const { date, time } = formatScheduledDate(updated.scheduledAt);
-    return {
-      ...mapBooking(updated),
-      email: updated.customer.email,
-      zone: updated.customer.zone,
-      timeline: updated.activities.map((activity) => ({
-        id: activity.id,
-        fromStatus: activity.fromStatus,
-        toStatus: activity.toStatus,
-        message: activity.message,
-        actor: activity.actor,
-        at: activity.createdAt.toISOString(),
-      })),
-      scheduledAt: updated.scheduledAt.toISOString(),
-      date,
-      time,
-    };
+    const result = detailPayload(updated as BookingDetailRow);
+
+    broadcast(
+      makeEvent(
+        "booking.updated",
+        `${mechanic.name} assigned to ${result.id} · ${statusLabelOf(fromStatus)} → ${statusLabelOf(toStatus)}`,
+        { id: result.id, status: result.status, mechanic: mechanic.name },
+      ),
+    );
+
+    return result;
+  },
+
+  async updateStatus(id: string, input: UpdateStatusInput) {
+    const booking = await bookingsRepository.findByIdOrNumber(id);
+    if (!booking) {
+      throw new ApiError(404, "Booking not found");
+    }
+
+    const next = input.status?.trim() ?? "";
+    if (!isBookingStatus(next)) {
+      throw new ApiError(400, "Invalid status");
+    }
+
+    const fromStatus = booking.status as BookingStatus;
+    if (fromStatus === next) {
+      return this.getById(id);
+    }
+
+    const allowed = ALLOWED_TRANSITIONS[fromStatus] ?? [];
+    if (!allowed.includes(next)) {
+      throw new ApiError(
+        400,
+        `Cannot move ${statusLabelOf(fromStatus)} → ${statusLabelOf(next)}`,
+      );
+    }
+
+    if (next === BookingStatus.assigned && !booking.mechanicId) {
+      throw new ApiError(400, "Assign a mechanic before marking Assigned");
+    }
+
+    const message =
+      next === BookingStatus.cancelled
+        ? `${booking.bookingNumber} cancelled`
+        : next === BookingStatus.completed
+          ? `${booking.bookingNumber} completed`
+          : next === BookingStatus.on_the_way
+            ? `${booking.mechanic?.name ?? "Mechanic"} is on the way · ${booking.bookingNumber}`
+            : `${booking.bookingNumber} marked ${statusLabelOf(next)}`;
+
+    const updated = await bookingsRepository.update(booking.id, {
+      status: next,
+      activities: {
+        create: {
+          fromStatus,
+          toStatus: next,
+          message,
+          actor: "Dispatch",
+        },
+      },
+    });
+
+    const result = detailPayload(updated as BookingDetailRow);
+
+    broadcast(
+      makeEvent(
+        "booking.updated",
+        `${message} · ${statusLabelOf(fromStatus)} → ${statusLabelOf(next)}`,
+        {
+          id: result.id,
+          status: result.status,
+          fromStatus,
+          toStatus: next,
+        },
+      ),
+    );
+
+    return result;
   },
 };

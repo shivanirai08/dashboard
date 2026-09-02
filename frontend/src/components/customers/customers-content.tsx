@@ -233,9 +233,12 @@ export default function CustomersContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
-  const load = useCallback(() => {
-    setLoading(true);
-    setError(false);
+  const load = useCallback((opts?: { silent?: boolean }) => {
+    const silent = Boolean(opts?.silent);
+    if (!silent) {
+      setLoading(true);
+      setError(false);
+    }
     api
       .getCustomers({
         q: debouncedQuery || undefined,
@@ -249,9 +252,14 @@ export default function CustomersContent() {
         setTotal(result.meta.total);
         setTotalPages(result.meta.totalPages);
         setSummary(result.summary);
+        setError(false);
       })
-      .catch(() => setError(true))
-      .finally(() => setLoading(false));
+      .catch(() => {
+        if (!silent) setError(true);
+      })
+      .finally(() => {
+        if (!silent) setLoading(false);
+      });
   }, [debouncedQuery, sort, page]);
 
   useEffect(() => {

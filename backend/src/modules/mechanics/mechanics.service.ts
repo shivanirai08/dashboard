@@ -1,5 +1,7 @@
-import { MechanicStatus } from "@prisma/client";
+import { MechanicStatus } from "../../lib/enums.js";
 import { ApiError } from "../../middleware/error-handler.js";
+import { makeEvent } from "../../realtime/events.js";
+import { broadcast } from "../../realtime/ws.js";
 import {
   buildMechanicWhere,
   mechanicsRepository,
@@ -104,6 +106,13 @@ export const mechanicsService = {
         : [],
     });
 
-    return mapMechanic(mechanic);
+    const mapped = mapMechanic(mechanic);
+    broadcast(
+      makeEvent("mechanic.created", `Mechanic ${mapped.name} joined the fleet`, {
+        id: mapped.id,
+        name: mapped.name,
+      }),
+    );
+    return mapped;
   },
 };

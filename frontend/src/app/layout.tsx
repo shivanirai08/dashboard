@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { OpsProvider } from "@/components/providers/ops-provider";
+import { LiveProvider } from "@/components/providers/live-provider";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import "./globals.css";
 
@@ -24,7 +25,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           }}
         />
         <ThemeProvider>
-          <OpsProvider>{children}</OpsProvider>
+          <LiveProvider>
+            <OpsProvider>{children}</OpsProvider>
+          </LiveProvider>
         </ThemeProvider>
       </body>
     </html>

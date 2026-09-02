@@ -41,4 +41,12 @@ export const bookingsController = {
     const booking = await bookingsService.reassign(paramAsString(req.params.id), req.body ?? {});
     res.json(booking);
   },
+
+  async updateStatus(req: Request, res: Response) {
+    const booking = await bookingsService.updateStatus(
+      paramAsString(req.params.id),
+      req.body ?? {},
+    );
+    res.json(booking);
+  },
 };

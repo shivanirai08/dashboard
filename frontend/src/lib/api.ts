@@ -189,6 +189,12 @@ export const api = {
       body: { mechanic },
     }),
 
+  updateBookingStatus: (id: string, status: string) =>
+    apiFetch<Booking>(`/api/bookings/${encodeURIComponent(id)}/status`, {
+      method: "PATCH",
+      body: { status },
+    }),
+
   getBookingStatusCounts: () => apiFetch<StatusCounts>("/api/bookings/meta/counts"),
 
   getBookingFilters: () => apiFetch<BookingFilters>("/api/bookings/meta/filters"),

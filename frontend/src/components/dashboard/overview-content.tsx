@@ -153,16 +153,24 @@ export default function OverviewContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
-  const load = useCallback(() => {
-    setLoading(true);
-    setError(false);
+  const load = useCallback((opts?: { silent?: boolean }) => {
+    const silent = Boolean(opts?.silent);
+    if (!silent) {
+      setLoading(true);
+      setError(false);
+    }
     api
       .getDashboard()
       .then((result) => {
         setData(result);
+        setError(false);
       })
-      .catch(() => setError(true))
-      .finally(() => setLoading(false));
+      .catch(() => {
+        if (!silent) setError(true);
+      })
+      .finally(() => {
+        if (!silent) setLoading(false);
+      });
   }, []);
 
   useEffect(() => {

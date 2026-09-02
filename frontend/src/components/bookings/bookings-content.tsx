@@ -119,18 +119,29 @@ function BookingDrawer({
   onPrev,
   onNext,
   position,
-  onReassigned,
+  onChanged,
 }: {
   booking: Booking;
   onClose: () => void;
   onPrev: () => void;
   onNext: () => void;
   position: string;
-  onReassigned: () => void;
+  onChanged: () => void;
 }) {
   const [mechanics, setMechanics] = useState<string[]>([]);
   const [reassignOpen, setReassignOpen] = useState(false);
   const [reassigning, setReassigning] = useState(false);
+  const [statusBusy, setStatusBusy] = useState(false);
+  const [statusError, setStatusError] = useState<string | null>(null);
+
+  const nextStatuses =
+    booking.status === "pending"
+      ? (["assigned", "cancelled"] as BookingStatus[])
+      : booking.status === "assigned"
+        ? (["on_the_way", "cancelled"] as BookingStatus[])
+        : booking.status === "on_the_way"
+          ? (["completed", "cancelled"] as BookingStatus[])
+          : [];
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -152,12 +163,33 @@ function BookingDrawer({
 
   async function reassign(mechanic: string) {
     setReassigning(true);
+    setStatusError(null);
     try {
       await api.reassignBooking(booking.id, mechanic);
       setReassignOpen(false);
-      onReassigned();
+      onChanged();
+    } catch (err) {
+      setStatusError(err instanceof Error ? err.message : "Could not assign mechanic");
     } finally {
       setReassigning(false);
+    }
+  }
+
+  async function setStatus(next: BookingStatus) {
+    if (next === "assigned" && !booking.mechanic) {
+      setStatusError("Assign a mechanic first");
+      setReassignOpen(true);
+      return;
+    }
+    setStatusBusy(true);
+    setStatusError(null);
+    try {
+      await api.updateBookingStatus(booking.id, next);
+      onChanged();
+    } catch (err) {
+      setStatusError(err instanceof Error ? err.message : "Could not update status");
+    } finally {
+      setStatusBusy(false);
     }
   }
 
@@ -233,10 +265,37 @@ function BookingDrawer({
               </div>
             ))}
           </dl>
+
+          {nextStatuses.length > 0 ? (
+            <div className="px-5 pb-4">
+              <p className="text-[11px] font-medium text-subtle">Update status</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {nextStatuses.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    disabled={statusBusy || reassigning}
+                    onClick={() => setStatus(s)}
+                    className={
+                      "inline-flex h-8 items-center rounded-lg border px-3 text-xs font-medium " +
+                      (s === "cancelled"
+                        ? "border-cancelled/30 bg-cancelled-soft text-cancelled hover:bg-cancelled-soft/80"
+                        : "border-border bg-surface text-muted hover:bg-surface-3 hover:text-foreground")
+                    }
+                  >
+                    {statusLabel[s]}
+                  </button>
+                ))}
+              </div>
+              {statusError ? (
+                <p className="mt-2 text-xs text-cancelled">{statusError}</p>
+              ) : null}
+            </div>
+          ) : null}
         </div>
 
         <footer className="relative flex items-center gap-2 border-t border-border px-5 py-3">
-          <PrimaryButton onClick={() => setReassignOpen((v) => !v)} disabled={reassigning}>
+          <PrimaryButton onClick={() => setReassignOpen((v) => !v)} disabled={reassigning || statusBusy}>
             {booking.mechanic ? "Reassign mechanic" : "Assign mechanic"}
           </PrimaryButton>
           <a
@@ -314,9 +373,12 @@ function BookingsContentInner() {
     loadMeta();
   }, [loadMeta]);
 
-  const reload = useCallback(() => {
-    setError(false);
-    setLoading(true);
+  const reload = useCallback((opts?: { silent?: boolean }) => {
+    const silent = Boolean(opts?.silent);
+    if (!silent) {
+      setLoading(true);
+      setError(false);
+    }
     api
       .getBookings({
         q: debouncedQuery || undefined,
@@ -331,9 +393,14 @@ function BookingsContentInner() {
         setRows(result.data);
         setTotal(result.meta.total);
         setTotalPages(result.meta.totalPages);
+        setError(false);
       })
-      .catch(() => setError(true))
-      .finally(() => setLoading(false));
+      .catch(() => {
+        if (!silent) setError(true);
+      })
+      .finally(() => {
+        if (!silent) setLoading(false);
+      });
     loadMeta();
   }, [debouncedQuery, status, service, sort, page, loadMeta]);
 
@@ -774,7 +841,7 @@ function BookingsContentInner() {
           onPrev={() => step(-1)}
           onNext={() => step(1)}
           position={`${selectedIndex + 1} of ${total}`}
-          onReassigned={reload}
+          onChanged={() => reload({ silent: true })}
         />
       ) : null}
     </AppLayout>

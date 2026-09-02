@@ -60,14 +60,24 @@ export default function AnalyticsContent() {
   const [error, setError] = useState(false);
   const statusColors = useStatusColors();
 
-  const load = useCallback(() => {
-    setLoading(true);
-    setError(false);
+  const load = useCallback((opts?: { silent?: boolean }) => {
+    const silent = Boolean(opts?.silent);
+    if (!silent) {
+      setLoading(true);
+      setError(false);
+    }
     api
       .getAnalytics(range)
-      .then(setData)
-      .catch(() => setError(true))
-      .finally(() => setLoading(false));
+      .then((result) => {
+        setData(result);
+        setError(false);
+      })
+      .catch(() => {
+        if (!silent) setError(true);
+      })
+      .finally(() => {
+        if (!silent) setLoading(false);
+      });
   }, [range]);
 
   useEffect(() => {

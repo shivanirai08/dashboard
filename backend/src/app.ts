@@ -26,7 +26,11 @@ export function createApp() {
   setupSwagger(app);
 
   app.get("/api/health", (_req, res) => {
-    res.json({ ok: true, service: "instant-mechanic-api" });
+    res.json({
+      ok: true,
+      service: "instant-mechanic-api",
+      realtime: "ws /ws",
+    });
   });
 
   app.use("/api/dashboard", dashboardRouter);

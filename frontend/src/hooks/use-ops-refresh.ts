@@ -2,11 +2,16 @@
 
 import { useEffect } from "react";
 
-/** Re-fetch when a create modal succeeds (booking / customer / mechanic). */
-export function useOpsRefresh(reload: () => void) {
+export type OpsReloadOptions = {
+  /** Keep current UI visible while refetching (used for live WS / background refresh). */
+  silent?: boolean;
+};
+
+/** Re-fetch when a create modal succeeds or a live WebSocket event arrives. */
+export function useOpsRefresh(reload: (opts?: OpsReloadOptions) => void) {
   useEffect(() => {
     function onRefresh() {
-      reload();
+      reload({ silent: true });
     }
     window.addEventListener("ops:refresh", onRefresh);
     return () => window.removeEventListener("ops:refresh", onRefresh);

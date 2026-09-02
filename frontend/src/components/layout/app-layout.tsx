@@ -20,6 +20,7 @@ import {
   X,
 } from "lucide-react";
 import CommandPalette, { useCommandPalette } from "@/components/layout/command-palette";
+import { useLive } from "@/components/providers/live-provider";
 import { useOps } from "@/components/providers/ops-provider";
 import { useTheme } from "@/components/providers/theme-provider";
 import { PrimaryButton } from "@/components/ui";
@@ -33,13 +34,6 @@ const NAV = [
 ];
 
 const COLLAPSE_KEY = "im-sidebar-collapsed";
-const NOTIF_READ_KEY = "im-notif-read";
-
-const NOTIFICATIONS = [
-  { id: "n1", text: "Rahul Sharma completed IM-48205" },
-  { id: "n2", text: "Battery jump-start booked in Andheri" },
-  { id: "n3", text: "New customer Aarav Mehta added" },
-] as const;
 
 function Logo({ collapsed }: { collapsed?: boolean }) {
   return (
@@ -173,10 +167,16 @@ export default function AppLayout({
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
-  const [readIds, setReadIds] = useState<Set<string>>(() => new Set());
-  const [notifHydrated, setNotifHydrated] = useState(false);
   const palette = useCommandPalette();
   const { openNewBooking } = useOps();
+  const {
+    connected,
+    notifications,
+    unreadCount,
+    markAllRead,
+    markOneRead,
+    isUnread,
+  } = useLive();
 
   // List pages already have in-bar search — avoid a second search in the header.
   const hasPageSearch =
@@ -189,35 +189,7 @@ export default function AppLayout({
     if (stored === "1") setCollapsed(true);
   }, []);
 
-  useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(NOTIF_READ_KEY);
-      const ids = raw ? (JSON.parse(raw) as string[]) : [];
-      if (Array.isArray(ids)) setReadIds(new Set(ids));
-    } catch {
-      /* ignore bad storage */
-    }
-    setNotifHydrated(true);
-  }, []);
-
-  function persistRead(next: Set<string>) {
-    setReadIds(next);
-    window.localStorage.setItem(NOTIF_READ_KEY, JSON.stringify([...next]));
-  }
-
-  function markAllRead() {
-    persistRead(new Set(NOTIFICATIONS.map((n) => n.id)));
-  }
-
-  function markOneRead(id: string) {
-    if (readIds.has(id)) return;
-    const next = new Set(readIds);
-    next.add(id);
-    persistRead(next);
-  }
-
-  const unreadCount = NOTIFICATIONS.filter((n) => !readIds.has(n.id)).length;
-  const showUnreadDot = notifHydrated && unreadCount > 0;
+  const showUnreadDot = unreadCount > 0;
 
   function toggleCollapse() {
     setCollapsed((prev) => {
@@ -331,6 +303,13 @@ export default function AppLayout({
                         {showUnreadDot ? (
                           <span className="ml-1.5 text-accent">{unreadCount} new</span>
                         ) : null}
+                        <span
+                          className={
+                            "ml-1.5 inline-block h-1.5 w-1.5 rounded-full " +
+                            (connected ? "bg-done" : "bg-subtle")
+                          }
+                          title={connected ? "Live" : "Reconnecting…"}
+                        />
                       </p>
                       {showUnreadDot ? (
                         <button
@@ -342,9 +321,9 @@ export default function AppLayout({
                         </button>
                       ) : null}
                     </div>
-                    <ul className="mt-2 space-y-1">
-                      {NOTIFICATIONS.map((item) => {
-                        const unread = !readIds.has(item.id);
+                    <ul className="mt-2 max-h-72 space-y-1 overflow-y-auto">
+                      {notifications.map((item) => {
+                        const unread = isUnread(item.id);
                         return (
                           <li key={item.id}>
                             <button

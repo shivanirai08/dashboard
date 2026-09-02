@@ -7,6 +7,8 @@ import {
   pctChange,
   startOfDay,
 } from "../../lib/formatters.js";
+import { makeEvent } from "../../realtime/events.js";
+import { broadcast } from "../../realtime/ws.js";
 import {
   buildCustomerWhere,
   customersRepository,
@@ -170,6 +172,13 @@ export const customersService = {
       zone: input.zone?.trim() || null,
     });
 
-    return mapCustomer(customer);
+    const mapped = await mapCustomer(customer);
+    broadcast(
+      makeEvent("customer.created", `New customer ${mapped.name} added`, {
+        id: mapped.id,
+        name: mapped.name,
+      }),
+    );
+    return mapped;
   },
 };
