@@ -1,53 +1,80 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Bell,
   ChartNoAxesColumn,
-  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   CircleGauge,
   ClipboardList,
   Menu,
+  Moon,
+  Plus,
   Search,
+  Sun,
   Users,
   Wrench,
   X,
 } from "lucide-react";
 import CommandPalette, { useCommandPalette } from "@/components/layout/command-palette";
+import { useOps } from "@/components/providers/ops-provider";
+import { useTheme } from "@/components/providers/theme-provider";
+import { PrimaryButton } from "@/components/ui";
 
 const NAV = [
-  { href: "/dashboard", label: "Overview", icon: CircleGauge, badge: null },
-  { href: "/analytics", label: "Analytics", icon: ChartNoAxesColumn, badge: null },
-  { href: "/bookings", label: "Bookings", icon: ClipboardList, badge: "37" },
-  { href: "/mechanics", label: "Mechanics", icon: Wrench, badge: null },
-  { href: "/customers", label: "Customers", icon: Users, badge: null },
+  { href: "/dashboard", label: "Overview", icon: CircleGauge },
+  { href: "/analytics", label: "Analytics", icon: ChartNoAxesColumn },
+  { href: "/bookings", label: "Bookings", icon: ClipboardList },
+  { href: "/mechanics", label: "Mechanics", icon: Wrench },
+  { href: "/customers", label: "Customers", icon: Users },
 ];
 
-function Logo() {
+const COLLAPSE_KEY = "im-sidebar-collapsed";
+const NOTIF_READ_KEY = "im-notif-read";
+
+const NOTIFICATIONS = [
+  { id: "n1", text: "Rahul Sharma completed IM-48205" },
+  { id: "n2", text: "Battery jump-start booked in Andheri" },
+  { id: "n3", text: "New customer Aarav Mehta added" },
+] as const;
+
+function Logo({ collapsed }: { collapsed?: boolean }) {
   return (
-    <Link href="/dashboard" className="flex items-center gap-2.5">
-      <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent">
+    <Link href="/dashboard" className="flex min-w-0 items-center gap-2.5">
+      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-accent">
         <Wrench size={15} strokeWidth={2} className="text-white" />
       </span>
-      <span className="text-[13px] font-bold tracking-tight text-foreground">
-        Instant Mechanic
-      </span>
+      {!collapsed ? (
+        <span className="truncate text-[13px] font-bold tracking-tight text-foreground">
+          Instant Mechanic
+        </span>
+      ) : null}
     </Link>
   );
 }
 
-function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
+function SidebarBody({
+  collapsed,
+  onToggleCollapse,
+  onNavigate,
+}: {
+  collapsed: boolean;
+  onToggleCollapse?: () => void;
+  onNavigate?: () => void;
+}) {
   const pathname = usePathname();
+  const { theme, toggleTheme } = useTheme();
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex h-14 items-center px-5">
-        <Logo />
+      <div className={"flex h-14 items-center " + (collapsed ? "justify-center px-2" : "px-4")}>
+        <Logo collapsed={collapsed} />
       </div>
 
-      <nav className="flex-1 px-3 pt-2">
+      <nav className={"flex-1 pt-1 " + (collapsed ? "px-2" : "px-3")}>
         <ul className="flex flex-col gap-0.5">
           {NAV.map((item) => {
             const Icon = item.icon;
@@ -60,20 +87,17 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
                 <Link
                   href={item.href}
                   onClick={onNavigate}
+                  title={collapsed ? item.label : undefined}
                   className={
-                    "flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium " +
+                    "flex items-center rounded-lg text-[13px] font-medium " +
+                    (collapsed ? "justify-center px-2 py-2.5 " : "gap-2.5 px-2.5 py-2 ") +
                     (isActive
                       ? "bg-accent-soft text-accent"
                       : "text-muted hover:bg-surface-3 hover:text-foreground")
                   }
                 >
                   <Icon size={16} strokeWidth={1.5} />
-                  <span className="flex-1">{item.label}</span>
-                  {item.badge ? (
-                    <span className="rounded-md bg-surface-3 px-1.5 py-0.5 text-[11px] font-medium tabular-nums text-muted">
-                      {item.badge}
-                    </span>
-                  ) : null}
+                  {!collapsed ? <span className="flex-1">{item.label}</span> : null}
                 </Link>
               </li>
             );
@@ -81,33 +105,56 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
         </ul>
       </nav>
 
-      <div className="p-3">
-        <div className="rounded-lg bg-surface-3 px-3.5 py-3">
-          <div className="flex items-baseline justify-between">
-            <span className="text-xs font-medium text-muted">Dispatch load</span>
-            <span className="text-xs font-semibold tabular-nums text-accent">78%</span>
-          </div>
-          <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-border">
-            <div className="h-full w-[78%] rounded-full bg-accent" />
-          </div>
-          <p className="mt-2 text-[11px] leading-relaxed text-subtle">
-            37 pending · 12 mechanics free
-          </p>
+      <div className={"space-y-2 p-3 " + (collapsed ? "px-2" : "")}>
+        {onToggleCollapse ? (
+          <button
+            onClick={onToggleCollapse}
+            className={
+              "hidden w-full items-center rounded-lg text-[13px] font-medium text-muted hover:bg-surface-3 hover:text-foreground lg:flex " +
+              (collapsed ? "justify-center px-2 py-2.5" : "gap-2.5 px-2.5 py-2")
+            }
+          >
+            {collapsed ? (
+              <ChevronRight size={16} strokeWidth={1.5} />
+            ) : (
+              <>
+                <ChevronLeft size={16} strokeWidth={1.5} />
+                <span>Collapse</span>
+              </>
+            )}
+          </button>
+        ) : null}
+
+        <button
+          onClick={toggleTheme}
+          title={theme === "dark" ? "Light mode" : "Dark mode"}
+          className={
+            "flex w-full items-center rounded-lg text-[13px] font-medium text-muted hover:bg-surface-3 hover:text-foreground " +
+            (collapsed ? "justify-center px-2 py-2.5" : "gap-2.5 px-2.5 py-2")
+          }
+        >
+          {theme === "dark" ? <Sun size={16} strokeWidth={1.5} /> : <Moon size={16} strokeWidth={1.5} />}
+          {!collapsed ? <span>{theme === "dark" ? "Light mode" : "Dark mode"}</span> : null}
+        </button>
+
+        <div
+          className={
+            "flex items-center rounded-lg bg-surface-3 " +
+            (collapsed ? "justify-center p-2" : "gap-2.5 px-2.5 py-2.5")
+          }
+        >
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-foreground text-[11px] font-semibold text-white dark:text-canvas">
+            AK
+          </span>
+          {!collapsed ? (
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-[13px] font-medium text-foreground">Alex Karim</p>
+              <p className="truncate text-[11px] text-subtle">Dispatch lead</p>
+            </div>
+          ) : null}
         </div>
       </div>
     </div>
-  );
-}
-
-function LivePill() {
-  return (
-    <span className="inline-flex items-center gap-1.5 rounded-full bg-accent-soft py-0.5 pl-1.5 pr-2.5">
-      <span className="relative flex h-1.5 w-1.5">
-        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent opacity-60" />
-        <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-accent" />
-      </span>
-      <span className="text-[11px] font-semibold tracking-tight text-accent">Ops live</span>
-    </span>
   );
 }
 
@@ -122,100 +169,223 @@ export default function AppLayout({
   actions?: ReactNode;
   children: ReactNode;
 }) {
-  const [open, setOpen] = useState(false);
+  const pathname = usePathname();
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [readIds, setReadIds] = useState<Set<string>>(() => new Set());
+  const [notifHydrated, setNotifHydrated] = useState(false);
   const palette = useCommandPalette();
+  const { openNewBooking } = useOps();
+
+  // List pages already have in-bar search — avoid a second search in the header.
+  const hasPageSearch =
+    pathname.startsWith("/bookings") ||
+    pathname.startsWith("/mechanics") ||
+    pathname.startsWith("/customers");
+
+  useEffect(() => {
+    const stored = window.localStorage.getItem(COLLAPSE_KEY);
+    if (stored === "1") setCollapsed(true);
+  }, []);
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(NOTIF_READ_KEY);
+      const ids = raw ? (JSON.parse(raw) as string[]) : [];
+      if (Array.isArray(ids)) setReadIds(new Set(ids));
+    } catch {
+      /* ignore bad storage */
+    }
+    setNotifHydrated(true);
+  }, []);
+
+  function persistRead(next: Set<string>) {
+    setReadIds(next);
+    window.localStorage.setItem(NOTIF_READ_KEY, JSON.stringify([...next]));
+  }
+
+  function markAllRead() {
+    persistRead(new Set(NOTIFICATIONS.map((n) => n.id)));
+  }
+
+  function markOneRead(id: string) {
+    if (readIds.has(id)) return;
+    const next = new Set(readIds);
+    next.add(id);
+    persistRead(next);
+  }
+
+  const unreadCount = NOTIFICATIONS.filter((n) => !readIds.has(n.id)).length;
+  const showUnreadDot = notifHydrated && unreadCount > 0;
+
+  function toggleCollapse() {
+    setCollapsed((prev) => {
+      const next = !prev;
+      window.localStorage.setItem(COLLAPSE_KEY, next ? "1" : "0");
+      return next;
+    });
+  }
+
+  const sidebarWidth = collapsed ? "lg:w-[72px]" : "lg:w-60";
+  const contentPad = collapsed ? "lg:pl-[72px]" : "lg:pl-60";
 
   return (
     <div className="min-h-screen bg-canvas">
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 border-r border-border bg-surface lg:block">
-        <SidebarBody />
+      <aside
+        className={
+          "fixed inset-y-0 left-0 z-30 hidden border-r border-border bg-surface transition-[width] duration-200 lg:block " +
+          sidebarWidth
+        }
+      >
+        <SidebarBody collapsed={collapsed} onToggleCollapse={toggleCollapse} />
       </aside>
 
-      {open ? (
+      {mobileOpen ? (
         <div className="fixed inset-0 z-50 lg:hidden">
-          <div className="absolute inset-0 bg-foreground/25" onClick={() => setOpen(false)} />
+          <div className="absolute inset-0 bg-foreground/25" onClick={() => setMobileOpen(false)} />
           <aside className="absolute inset-y-0 left-0 w-60 bg-surface shadow-panel">
             <button
-              onClick={() => setOpen(false)}
+              onClick={() => setMobileOpen(false)}
               className="absolute right-3 top-3.5 rounded-md p-1.5 text-subtle hover:bg-surface-3 hover:text-foreground"
               aria-label="Close navigation"
             >
               <X size={16} strokeWidth={1.5} />
             </button>
-            <SidebarBody onNavigate={() => setOpen(false)} />
+            <SidebarBody collapsed={false} onNavigate={() => setMobileOpen(false)} />
           </aside>
         </div>
       ) : null}
 
-      <div className="lg:pl-60">
+      <div className={"transition-[padding] duration-200 " + contentPad}>
         <header className="sticky top-0 z-20 bg-canvas/95 backdrop-blur-sm">
-          <div className="flex h-14 items-center gap-3 border-b border-border bg-surface px-5 sm:px-6 lg:px-7">
+          <div
+            className={
+              "flex h-14 items-center gap-3 border-b border-border bg-surface px-3 sm:px-4 lg:px-5"
+            }
+          >
             <button
-              onClick={() => setOpen(true)}
+              onClick={() => setMobileOpen(true)}
               className="-ml-1.5 rounded-md p-1.5 text-muted hover:bg-surface-3 hover:text-foreground lg:hidden"
               aria-label="Open navigation"
             >
               <Menu size={18} strokeWidth={1.5} />
             </button>
 
-            <div className="flex min-w-0 flex-1 items-center gap-2.5">
-              <h1 className="truncate text-[15px] font-semibold tracking-tight text-foreground">
+            <div className="flex min-w-0 flex-1 items-center gap-3">
+              <h1 className="truncate text-lg font-semibold tracking-tight text-foreground">
                 {title}
               </h1>
-              <LivePill />
               {subtitle ? (
-                <span className="hidden truncate border-l border-border pl-2.5 text-xs text-subtle lg:block">
+                <span className="hidden truncate border-l border-border pl-3 text-[13px] text-muted sm:inline">
                   {subtitle}
                 </span>
               ) : null}
             </div>
 
-            <button
-              onClick={() => palette.setOpen(true)}
-              className="hidden h-8 items-center gap-2 rounded-lg border border-border bg-surface-2 pl-2.5 pr-2 text-xs text-subtle hover:border-border-strong hover:text-muted md:flex"
-            >
-              <Search size={14} strokeWidth={1.5} />
-              <span className="w-28 text-left lg:w-40">Search…</span>
-              <kbd className="rounded border border-border bg-surface px-1.5 py-0.5 text-[11px] font-medium">
-                ⌘K
-              </kbd>
-            </button>
+            {!hasPageSearch ? (
+              <>
+                <button
+                  onClick={() => palette.setOpen(true)}
+                  className="hidden h-8 items-center gap-2 rounded-lg border border-border bg-surface-2 pl-2.5 pr-2 text-xs text-subtle hover:border-border-strong hover:text-muted md:flex"
+                >
+                  <Search size={14} strokeWidth={1.5} />
+                  <span className="w-24 text-left lg:w-36">Search…</span>
+                  <kbd className="rounded border border-border bg-surface px-1.5 py-0.5 text-[11px] font-medium">
+                    ⌘K
+                  </kbd>
+                </button>
 
-            <button
-              onClick={() => palette.setOpen(true)}
-              className="rounded-lg p-1.5 text-muted hover:bg-surface-3 hover:text-foreground md:hidden"
-              aria-label="Search"
-            >
-              <Search size={17} strokeWidth={1.5} />
-            </button>
+                <button
+                  onClick={() => palette.setOpen(true)}
+                  className="rounded-lg p-1.5 text-muted hover:bg-surface-3 hover:text-foreground md:hidden"
+                  aria-label="Search"
+                >
+                  <Search size={17} strokeWidth={1.5} />
+                </button>
+              </>
+            ) : null}
 
-            <button
-              className="relative rounded-lg p-1.5 text-muted hover:bg-surface-3 hover:text-foreground"
-              aria-label="Notifications"
-            >
-              <Bell size={17} strokeWidth={1.5} />
-              <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-accent ring-2 ring-surface" />
-            </button>
+            <div className="relative">
+              <button
+                onClick={() => setNotifOpen((v) => !v)}
+                className="relative rounded-lg p-1.5 text-muted hover:bg-surface-3 hover:text-foreground"
+                aria-label={
+                  showUnreadDot
+                    ? `Notifications, ${unreadCount} unread`
+                    : "Notifications"
+                }
+              >
+                <Bell size={17} strokeWidth={1.5} />
+                {showUnreadDot ? (
+                  <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-accent ring-2 ring-surface" />
+                ) : null}
+              </button>
+              {notifOpen ? (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setNotifOpen(false)} />
+                  <div className="absolute right-0 top-10 z-50 w-72 rounded-xl border border-border bg-surface p-3 shadow-panel">
+                    <div className="flex items-center justify-between gap-2 px-1">
+                      <p className="text-[11px] font-medium text-subtle">
+                        Notifications
+                        {showUnreadDot ? (
+                          <span className="ml-1.5 text-accent">{unreadCount} new</span>
+                        ) : null}
+                      </p>
+                      {showUnreadDot ? (
+                        <button
+                          type="button"
+                          onClick={markAllRead}
+                          className="text-[11px] font-medium text-accent hover:text-accent-hover"
+                        >
+                          Mark all as read
+                        </button>
+                      ) : null}
+                    </div>
+                    <ul className="mt-2 space-y-1">
+                      {NOTIFICATIONS.map((item) => {
+                        const unread = !readIds.has(item.id);
+                        return (
+                          <li key={item.id}>
+                            <button
+                              type="button"
+                              onClick={() => markOneRead(item.id)}
+                              className={
+                                "flex w-full items-start gap-2 rounded-lg px-2.5 py-2 text-left text-[13px] hover:bg-surface-3 " +
+                                (unread ? "font-medium text-foreground" : "text-muted")
+                              }
+                            >
+                              {unread ? (
+                                <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
+                              ) : (
+                                <span className="mt-1.5 h-1.5 w-1.5 shrink-0" />
+                              )}
+                              <span className="min-w-0 flex-1">{item.text}</span>
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                </>
+              ) : null}
+            </div>
 
-            <button className="flex items-center gap-2 rounded-lg py-1 pl-1 pr-1.5 hover:bg-surface-3">
-              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-foreground text-[11px] font-semibold text-white">
-                AK
-              </span>
-              <span className="hidden text-xs font-medium text-foreground xl:block">
-                Alex Karim
-              </span>
-              <ChevronDown size={14} strokeWidth={1.5} className="hidden text-subtle xl:block" />
-            </button>
+            <PrimaryButton onClick={() => openNewBooking()}>
+              <Plus size={14} strokeWidth={2} />
+              <span className="hidden sm:inline">New booking</span>
+              <span className="sm:hidden">New</span>
+            </PrimaryButton>
           </div>
 
           {actions ? (
-            <div className="flex flex-wrap items-center gap-2 border-b border-border bg-surface px-5 py-2.5 sm:px-6 lg:px-7">
+            <div className="flex flex-wrap items-center gap-2 bg-surface px-3 py-2.5 sm:px-4 lg:px-5">
               {actions}
             </div>
           ) : null}
         </header>
 
-        <main className="px-5 py-6 sm:px-6 lg:px-7 lg:py-7">{children}</main>
+        <main className="px-3 py-5 sm:px-4 lg:px-5 lg:py-6">{children}</main>
       </div>
 
       <CommandPalette open={palette.open} onClose={() => palette.setOpen(false)} />

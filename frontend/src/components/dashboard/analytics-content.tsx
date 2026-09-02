@@ -7,7 +7,7 @@ import {
   RevenueArea,
   ServiceBars,
   StatusDonut,
-  statusColors,
+  useStatusColors,
 } from "@/components/charts";
 import AppLayout from "@/components/layout/app-layout";
 import {
@@ -21,6 +21,8 @@ import {
 } from "@/components/ui";
 import { api, type AnalyticsData } from "@/lib/api";
 import { compactMoney } from "@/lib/format";
+import { downloadCsv } from "@/lib/export";
+import { useOpsRefresh } from "@/hooks/use-ops-refresh";
 
 type Range = "7d" | "30d" | "90d";
 
@@ -56,6 +58,7 @@ export default function AnalyticsContent() {
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const statusColors = useStatusColors();
 
   const load = useCallback(() => {
     setLoading(true);
@@ -71,7 +74,14 @@ export default function AnalyticsContent() {
     load();
   }, [load]);
 
-  const totals = data?.totals ?? { bookings: 0, revenue: 0, completionRate: 0 };
+  useOpsRefresh(load);
+
+  const totals = data?.totals ?? {
+    bookings: 0,
+    revenue: 0,
+    completionRate: 0,
+    deltas: { bookings: null, revenue: null, completionRate: null },
+  };
   const series = data?.series ?? [];
   const statusBreakdown = data?.statusBreakdown ?? [];
   const serviceBreakdown = data?.serviceBreakdown ?? [];
@@ -79,9 +89,21 @@ export default function AnalyticsContent() {
 
   const statCards = useMemo(
     () => [
-      { label: "Bookings", value: totals.bookings.toLocaleString("en-IN"), delta: 8.4 },
-      { label: "Revenue", value: data?.revenueFormatted ?? compactMoney(totals.revenue), delta: 11.7 },
-      { label: "Completion rate", value: `${totals.completionRate}%`, delta: 1.9 },
+      {
+        label: "Bookings",
+        value: totals.bookings.toLocaleString("en-IN"),
+        delta: totals.deltas.bookings,
+      },
+      {
+        label: "Revenue",
+        value: data?.revenueFormatted ?? compactMoney(totals.revenue),
+        delta: totals.deltas.revenue,
+      },
+      {
+        label: "Completion rate",
+        value: `${totals.completionRate}%`,
+        delta: totals.deltas.completionRate,
+      },
     ],
     [totals, data?.revenueFormatted],
   );
@@ -94,16 +116,29 @@ export default function AnalyticsContent() {
         <>
           <RangeToggle value={range} onChange={setRange} />
           <div className="ml-auto flex items-center gap-2">
-            <GhostButton>
+            <GhostButton
+              onClick={() => {
+                if (!data) return;
+                downloadCsv(
+                  `analytics-${range}.csv`,
+                  data.series.map((row) => ({
+                    date: row.full,
+                    bookings: row.bookings,
+                    completed: row.completed,
+                    revenue: row.revenue,
+                  })),
+                );
+              }}
+            >
               <Download size={14} strokeWidth={1.5} />
-              Export CSV
+              <span className="hidden sm:inline">Export CSV</span>
             </GhostButton>
           </div>
         </>
       }
     >
-      <div className="mx-auto flex max-w-[1320px] flex-col gap-5">
-        <div className="grid grid-cols-1 gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-3">
+      <div className="mx-auto flex max-w-none flex-col gap-5">
+        <div className="grid grid-cols-1 gap-px overflow-hidden rounded-xl border border-border bg-border shadow-card sm:grid-cols-3">
           {statCards.map((s) => (
             <div key={s.label} className="bg-surface px-5 py-4">
               <p className="text-[11px] font-medium text-muted">{s.label}</p>
@@ -155,10 +190,23 @@ export default function AnalyticsContent() {
               title="Revenue over time"
               subtitle="Invoiced value of completed jobs"
               right={
-                <span className="inline-flex items-center gap-1.5 rounded-md bg-done-soft px-2 py-1 text-[11px] font-medium text-done">
-                  <TrendingUp size={12} strokeWidth={2} />
-                  Trending up
-                </span>
+                totals.deltas.revenue == null ? undefined : (
+                  <span
+                    className={
+                      "inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-medium " +
+                      (totals.deltas.revenue >= 0
+                        ? "bg-done-soft text-done"
+                        : "bg-cancelled-soft text-cancelled")
+                    }
+                  >
+                    <TrendingUp
+                      size={12}
+                      strokeWidth={2}
+                      className={totals.deltas.revenue < 0 ? "rotate-180" : undefined}
+                    />
+                    {totals.deltas.revenue >= 0 ? "Trending up" : "Trending down"}
+                  </span>
+                )
               }
             />
             {loading ? (

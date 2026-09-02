@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { BookingsLine, RevenueArea } from "@/components/charts";
 import AppLayout from "@/components/layout/app-layout";
+import { useOps } from "@/components/providers/ops-provider";
 import {
   ChartSkeleton,
   EmptyState,
@@ -33,6 +34,7 @@ import {
 } from "@/components/ui";
 import { api, type DashboardOverview } from "@/lib/api";
 import { compactMoney, formatTodaySubtitle, money } from "@/lib/format";
+import { useOpsRefresh } from "@/hooks/use-ops-refresh";
 import type { Activity, Booking, Kpi, SeriesPoint } from "@/types";
 
 const ICONS = {
@@ -58,18 +60,18 @@ const DRILL: Record<string, string> = {
 };
 
 const EMPTY_KPIS: Kpi[] = [
-  { key: "total", label: "Total bookings", value: "—", delta: 0, icon: "calendar" },
-  { key: "today", label: "Today", value: "—", delta: 0, icon: "clock", tone: "accent" },
-  { key: "completed", label: "Completed", value: "—", delta: 0, icon: "check" },
-  { key: "pending", label: "Pending", value: "—", delta: 0, icon: "hourglass", tone: "accent" },
-  { key: "cancelled", label: "Cancelled", value: "—", delta: 0, icon: "x" },
-  { key: "revenue", label: "Total revenue", value: "—", delta: 0, icon: "revenue" },
-  { key: "mechanics", label: "Active mechanics", value: "—", delta: 0, icon: "wrench" },
-  { key: "customers", label: "New customers", value: "—", delta: 0, icon: "users" },
+  { key: "total", label: "Total bookings", value: "—", delta: null, icon: "calendar" },
+  { key: "today", label: "Today", value: "—", delta: null, icon: "clock", tone: "accent" },
+  { key: "completed", label: "Completed", value: "—", delta: null, icon: "check" },
+  { key: "pending", label: "Pending", value: "—", delta: null, icon: "hourglass", tone: "accent" },
+  { key: "cancelled", label: "Cancelled", value: "—", delta: null, icon: "x" },
+  { key: "revenue", label: "Total revenue", value: "—", delta: null, icon: "revenue" },
+  { key: "mechanics", label: "Active mechanics", value: "—", delta: null, icon: "wrench" },
+  { key: "customers", label: "New customers", value: "—", delta: null, icon: "users" },
 ];
 
 const RAIL =
-  "grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-4 xl:grid-cols-8";
+  "grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border shadow-card sm:grid-cols-4 xl:grid-cols-8";
 
 function KpiRail({ kpis }: { kpis: Kpi[] }) {
   return (
@@ -82,12 +84,6 @@ function KpiRail({ kpis }: { kpis: Kpi[] }) {
             href={DRILL[k.key]}
             className="group relative block bg-surface px-4 py-4 hover:bg-surface-2 focus:outline-none focus-visible:bg-surface-2"
           >
-            <span
-              className={
-                "absolute inset-x-0 top-0 h-0.5 " +
-                (k.tone === "accent" ? "bg-accent" : "bg-transparent")
-              }
-            />
             <div className="flex items-center gap-1.5">
               <Icon size={13} strokeWidth={1.5} className="text-subtle group-hover:text-accent" />
               <p className="truncate text-[11px] font-medium text-muted">{k.label}</p>
@@ -152,10 +148,10 @@ function Legend({ items }: { items: { label: string; className: string }[] }) {
 }
 
 export default function OverviewContent() {
+  const { openNewBooking } = useOps();
   const [data, setData] = useState<DashboardOverview | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const [syncedAt, setSyncedAt] = useState<Date | null>(null);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -164,7 +160,6 @@ export default function OverviewContent() {
       .getDashboard()
       .then((result) => {
         setData(result);
-        setSyncedAt(new Date());
       })
       .catch(() => setError(true))
       .finally(() => setLoading(false));
@@ -173,6 +168,8 @@ export default function OverviewContent() {
   useEffect(() => {
     load();
   }, [load]);
+
+  useOpsRefresh(load);
 
   const kpis = data?.kpis ?? [];
   const series30: SeriesPoint[] = data?.series30 ?? [];
@@ -184,37 +181,20 @@ export default function OverviewContent() {
     [series30],
   );
 
-  const pendingCount = useMemo(() => {
-    const pending = kpis.find((k) => k.key === "pending");
-    return pending?.value ?? "0";
-  }, [kpis]);
+  const revenueDelta = useMemo(() => {
+    if (series30.length < 2) return null;
+    const mid = Math.floor(series30.length / 2);
+    const prev = series30.slice(0, mid).reduce((sum, point) => sum + point.revenue, 0);
+    const curr = series30.slice(mid).reduce((sum, point) => sum + point.revenue, 0);
+    if (prev === 0) return curr === 0 ? null : 100;
+    return Math.round(((curr - prev) / prev) * 1000) / 10;
+  }, [series30]);
 
   const empty = !loading && !error && kpis.length === 0;
 
   return (
-    <AppLayout
-      title="Live Ops"
-      subtitle={formatTodaySubtitle()}
-      actions={
-        <>
-          <PrimaryButton>
-            <Plus size={14} strokeWidth={2} />
-            New booking
-          </PrimaryButton>
-          <Link
-            href="/bookings?status=pending"
-            className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-pending-soft px-3 text-xs font-medium text-pending hover:bg-pending-soft/70"
-          >
-            {pendingCount} jobs awaiting dispatch
-            <ArrowRight size={13} strokeWidth={2} />
-          </Link>
-          <span className="ml-auto text-xs text-subtle">
-            {syncedAt ? `Synced ${syncedAt.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}` : "Syncing…"}
-          </span>
-        </>
-      }
-    >
-      <div className="mx-auto flex max-w-[1320px] flex-col gap-5">
+    <AppLayout title="Overview" subtitle={formatTodaySubtitle()}>
+      <div className="mx-auto flex max-w-none flex-col gap-5">
         {loading ? (
           <KpiRailSkeleton />
         ) : empty ? (
@@ -264,7 +244,7 @@ export default function OverviewContent() {
                   <p className="text-[13px] font-semibold tabular-nums tracking-tight text-foreground">
                     {compactMoney(revenueTotal)}
                   </p>
-                  <Trend delta={11.7} />
+                  <Trend delta={revenueDelta} />
                 </div>
               }
             />
@@ -313,7 +293,7 @@ export default function OverviewContent() {
                 title="No bookings yet"
                 body="New jobs land here the moment a customer requests roadside help."
                 action={
-                  <PrimaryButton>
+                  <PrimaryButton onClick={() => openNewBooking()}>
                     <Plus size={14} strokeWidth={2} />
                     Create booking
                   </PrimaryButton>

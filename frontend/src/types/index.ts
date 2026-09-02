@@ -48,7 +48,7 @@ export type Kpi = {
   key: string;
   label: string;
   value: string;
-  delta: number;
+  delta: number | null;
   icon: "calendar" | "clock" | "check" | "hourglass" | "x" | "revenue" | "wrench" | "users";
   tone?: "accent" | "neutral";
 };

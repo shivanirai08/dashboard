@@ -20,4 +20,9 @@ export const mechanicsController = {
     const mechanic = await mechanicsService.getById(paramAsString(req.params.id));
     res.json(mechanic);
   },
+
+  async create(req: Request, res: Response) {
+    const mechanic = await mechanicsService.create(req.body ?? {});
+    res.status(201).json(mechanic);
+  },
 };

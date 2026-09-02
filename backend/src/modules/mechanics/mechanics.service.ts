@@ -81,4 +81,29 @@ export const mechanicsService = {
 
     return counts;
   },
+
+  async create(input: {
+    name?: string;
+    phone?: string;
+    zone?: string;
+    specialties?: string[];
+  }) {
+    const name = input.name?.trim();
+    const phone = input.phone?.trim();
+    const zone = input.zone?.trim();
+    if (!name || !phone || !zone) {
+      throw new ApiError(400, "Name, phone and zone are required");
+    }
+
+    const mechanic = await mechanicsRepository.create({
+      name,
+      phone,
+      zone,
+      specialties: Array.isArray(input.specialties)
+        ? input.specialties.map((s) => String(s).trim()).filter(Boolean)
+        : [],
+    });
+
+    return mapMechanic(mechanic);
+  },
 };

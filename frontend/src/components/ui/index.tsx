@@ -22,7 +22,9 @@ export function Panel({
   className?: string;
 }) {
   return (
-    <section className={"rounded-xl border border-border bg-surface " + className}>
+    <section
+      className={"rounded-xl border border-border bg-surface shadow-card " + className}
+    >
       {children}
     </section>
   );
@@ -40,9 +42,9 @@ export function PanelHead({
   return (
     <header className="flex items-center justify-between gap-4 border-b border-border px-5 py-3.5">
       <div className="min-w-0">
-        <h2 className="text-[13px] font-semibold tracking-tight text-foreground">{title}</h2>
+        <h2 className="text-sm font-semibold tracking-tight text-foreground">{title}</h2>
         {subtitle ? (
-          <p className="mt-0.5 truncate text-xs text-subtle">{subtitle}</p>
+          <p className="mt-0.5 truncate text-[12px] text-muted">{subtitle}</p>
         ) : null}
       </div>
       {right ? <div className="shrink-0">{right}</div> : null}
@@ -70,11 +72,11 @@ export function StatusPill({ status }: { status: BookingStatus }) {
   return (
     <span
       className={
-        "inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium " +
+        "inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-2 py-1 text-xs font-medium " +
         bookingPill[status]
       }
     >
-      <span className={"h-1.5 w-1.5 rounded-full " + bookingDot[status]} />
+      <span className={"h-1.5 w-1.5 shrink-0 rounded-full " + bookingDot[status]} />
       {statusLabel[status]}
     </span>
   );
@@ -100,11 +102,11 @@ export function MechanicPill({ status }: { status: MechanicStatus }) {
   return (
     <span
       className={
-        "inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium " +
+        "inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-2 py-1 text-[11px] font-medium " +
         mechPill[status]
       }
     >
-      <span className="relative flex h-1.5 w-1.5">
+      <span className="relative flex h-1.5 w-1.5 shrink-0">
         {status !== "offline" ? (
           <span
             className={
@@ -120,7 +122,14 @@ export function MechanicPill({ status }: { status: MechanicStatus }) {
   );
 }
 
-export function Trend({ delta, className = "" }: { delta: number; className?: string }) {
+export function Trend({
+  delta,
+  className = "",
+}: {
+  delta: number | null | undefined;
+  className?: string;
+}) {
+  if (delta == null || Number.isNaN(delta)) return null;
   const up = delta >= 0;
   const Icon = up ? ArrowUpRight : ArrowDownRight;
   return (
@@ -202,7 +211,7 @@ export function EmptyState({
       <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-surface-3 text-subtle">
         {icon}
       </div>
-      <p className="text-[13px] font-semibold tracking-tight text-foreground">{title}</p>
+      <p className="text-sm font-semibold tracking-tight text-foreground">{title}</p>
       <p className="mt-1.5 max-w-xs text-xs leading-relaxed text-muted">{body}</p>
       {action ? <div className="mt-5">{action}</div> : null}
     </div>
@@ -226,7 +235,7 @@ export function ErrorState({
       <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-cancelled-soft text-cancelled">
         <TriangleAlert size={18} strokeWidth={1.5} />
       </div>
-      <p className="text-[13px] font-semibold tracking-tight text-foreground">
+      <p className="text-sm font-semibold tracking-tight text-foreground">
         Couldn&apos;t reach dispatch
       </p>
       <p className="mt-1.5 max-w-xs text-xs leading-relaxed text-muted">
@@ -246,14 +255,54 @@ export function ErrorState({
 export function PrimaryButton({
   children,
   onClick,
+  type = "button",
+  disabled = false,
+  className = "",
 }: {
   children: ReactNode;
   onClick?: () => void;
+  type?: "button" | "submit";
+  disabled?: boolean;
+  className?: string;
 }) {
   return (
     <button
+      type={type}
       onClick={onClick}
-      className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-accent px-3 text-xs font-semibold text-white hover:bg-accent-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring"
+      disabled={disabled}
+      className={
+        "inline-flex h-8 items-center gap-1.5 rounded-lg bg-accent px-3 text-xs font-semibold text-white hover:bg-accent-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring disabled:cursor-not-allowed disabled:opacity-50 " +
+        className
+      }
+    >
+      {children}
+    </button>
+  );
+}
+
+/** Mid-emphasis CTA — soft accent fill (below Primary, above Ghost). */
+export function SoftButton({
+  children,
+  onClick,
+  type = "button",
+  disabled = false,
+  className = "",
+}: {
+  children: ReactNode;
+  onClick?: () => void;
+  type?: "button" | "submit";
+  disabled?: boolean;
+  className?: string;
+}) {
+  return (
+    <button
+      type={type}
+      onClick={onClick}
+      disabled={disabled}
+      className={
+        "inline-flex h-8 items-center gap-1.5 rounded-lg bg-accent-soft px-3 text-xs font-semibold text-accent hover:bg-accent-soft/80 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring disabled:cursor-not-allowed disabled:opacity-50 " +
+        className
+      }
     >
       {children}
     </button>
@@ -264,19 +313,28 @@ export function GhostButton({
   children,
   onClick,
   active = false,
+  type = "button",
+  disabled = false,
+  className = "",
 }: {
   children: ReactNode;
   onClick?: () => void;
   active?: boolean;
+  type?: "button" | "submit";
+  disabled?: boolean;
+  className?: string;
 }) {
   return (
     <button
+      type={type}
       onClick={onClick}
+      disabled={disabled}
       className={
-        "inline-flex h-8 items-center gap-1.5 rounded-lg border px-3 text-xs font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring " +
+        "inline-flex h-8 items-center gap-1.5 rounded-lg border px-3 text-xs font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring disabled:cursor-not-allowed disabled:opacity-50 " +
         (active
-          ? "border-border-strong bg-surface-3 text-foreground"
-          : "border-border bg-surface text-muted hover:bg-surface-3 hover:text-foreground")
+          ? "border-border-strong bg-surface-3 text-foreground "
+          : "border-border bg-surface text-muted hover:bg-surface-3 hover:text-foreground ") +
+        className
       }
     >
       {children}

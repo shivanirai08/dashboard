@@ -66,6 +66,69 @@ export const bookingsRepository = {
       select: { name: true },
     });
   },
+
+  findLatestBookingNumber() {
+    return prisma.booking.findFirst({
+      orderBy: { bookingNumber: "desc" },
+      select: { bookingNumber: true },
+    });
+  },
+
+  findServiceByName(name: string) {
+    return prisma.serviceCategory.findFirst({
+      where: { name: { equals: name, mode: "insensitive" } },
+    });
+  },
+
+  findCustomerByPhone(phone: string) {
+    return prisma.customer.findFirst({ where: { phone } });
+  },
+
+  createCustomer(data: {
+    name: string;
+    phone: string;
+    email?: string | null;
+    zone?: string | null;
+  }) {
+    return prisma.customer.create({ data });
+  },
+
+  findMechanicByIdOrName(idOrName: string) {
+    return prisma.mechanic.findFirst({
+      where: {
+        OR: [{ id: idOrName }, { name: { equals: idOrName, mode: "insensitive" } }],
+      },
+    });
+  },
+
+  create(data: Prisma.BookingCreateInput) {
+    return prisma.booking.create({
+      data,
+      include: bookingInclude,
+    });
+  },
+
+  update(id: string, data: Prisma.BookingUpdateInput) {
+    return prisma.booking.update({
+      where: { id },
+      data,
+      include: {
+        ...bookingInclude,
+        customer: { select: { name: true, phone: true, email: true, zone: true } },
+        activities: { orderBy: { createdAt: "asc" } },
+      },
+    });
+  },
+
+  createActivity(data: {
+    bookingId: string;
+    fromStatus: BookingStatus | null;
+    toStatus: BookingStatus;
+    message: string;
+    actor: string;
+  }) {
+    return prisma.bookingActivity.create({ data });
+  },
 };
 
 export type SortKey = "id" | "customer" | "service" | "mechanic" | "amount" | "date";

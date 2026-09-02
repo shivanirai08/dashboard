@@ -7,6 +7,7 @@ import {
   List,
   MapPin,
   Phone,
+  Plus,
   Search,
   Star,
   UserRoundX,
@@ -22,11 +23,15 @@ import {
   MechanicPill,
   Panel,
   PrimaryButton,
+  SoftButton,
   Skeleton,
 } from "@/components/ui";
+import { useOps } from "@/components/providers/ops-provider";
 import { api, type MechanicStatusCounts } from "@/lib/api";
 import { mechanicStatusLabel } from "@/lib/format";
+import { phoneHref } from "@/lib/export";
 import { useDebounce } from "@/hooks/use-debounce";
+import { useOpsRefresh } from "@/hooks/use-ops-refresh";
 import type { Mechanic, MechanicStatus } from "@/types";
 
 const FILTERS: { key: MechanicStatus | "all"; label: string }[] = [
@@ -43,54 +48,56 @@ const accentRing: Record<MechanicStatus, string> = {
 };
 
 function MechanicCard({ m, onOpen }: { m: Mechanic; onOpen: () => void }) {
+  const job = m.currentBooking ?? m.lastBooking;
+
   return (
     <button
       onClick={onOpen}
-      className="group flex flex-col items-start rounded-xl border border-border bg-surface p-4 text-left hover:border-border-strong hover:bg-surface-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring"
+      className="group flex flex-col rounded-xl border border-border bg-surface p-4 text-left shadow-card transition-[box-shadow,border-color] hover:border-border-strong hover:shadow-raised focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring"
     >
-      <div className="flex w-full items-start justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <span
-            className={
-              "rounded-full ring-2 ring-offset-2 ring-offset-surface " + accentRing[m.status]
-            }
-          >
-            <Initials name={m.name} size="lg" tone={m.status === "on_job" ? "accent" : "neutral"} />
-          </span>
-          <div>
-            <p className="text-sm font-semibold tracking-tight text-foreground">{m.name}</p>
-            <p className="mt-1 inline-flex items-center gap-1 text-[11px] text-subtle">
-              <MapPin size={10} strokeWidth={1.5} />
-              {m.zone} · {m.id}
-            </p>
+      <div className="flex w-full items-start gap-3">
+        <span
+          className={
+            "shrink-0 rounded-full ring-2 ring-offset-2 ring-offset-surface " + accentRing[m.status]
+          }
+        >
+          <Initials name={m.name} size="lg" tone={m.status === "on_job" ? "accent" : "neutral"} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-2">
+            <p className="truncate text-sm font-semibold tracking-tight text-foreground">{m.name}</p>
+            <MechanicPill status={m.status} />
           </div>
+          <p className="mt-1 flex items-center gap-1 truncate text-xs text-muted">
+            <MapPin size={12} strokeWidth={1.5} className="shrink-0 text-subtle" />
+            <span className="truncate">{m.zone}</span>
+          </p>
         </div>
-        <MechanicPill status={m.status} />
       </div>
 
-      <div className="mt-4 flex w-full items-center gap-5">
-        <div>
+      <div className="mt-4 grid w-full grid-cols-2 gap-2">
+        <div className="rounded-lg bg-surface-2 px-3 py-2.5">
           <p className="text-[11px] text-subtle">Jobs done</p>
-          <p className="mt-0.5 text-base font-semibold tabular-nums tracking-tight text-foreground">
+          <p className="mt-0.5 text-[15px] font-semibold tabular-nums tracking-tight text-foreground">
             {m.jobsCompleted}
           </p>
         </div>
-        <div>
+        <div className="rounded-lg bg-surface-2 px-3 py-2.5">
           <p className="text-[11px] text-subtle">Rating</p>
-          <p className="mt-0.5 inline-flex items-center gap-1 text-base font-semibold tabular-nums tracking-tight text-foreground">
+          <p className="mt-0.5 inline-flex items-center gap-1 text-[15px] font-semibold tabular-nums tracking-tight text-foreground">
             <Star size={13} strokeWidth={2} className="text-accent" />
-            {m.rating}
+            {m.rating.toFixed(1)}
           </p>
         </div>
       </div>
 
-      <div className="mt-4 w-full border-t border-border pt-3">
-        <p className="text-[11px] text-subtle">{m.currentBooking ? "Current job" : "Last job"}</p>
-        <p className="mt-1 truncate text-[13px] text-foreground">
-          {(m.currentBooking ?? m.lastBooking).service}
+      <div className="mt-3 w-full rounded-lg border border-border px-3 py-2.5">
+        <p className="text-[11px] font-medium text-subtle">
+          {m.currentBooking ? "Current job" : "Last job"}
         </p>
-        <p className="mt-0.5 truncate text-[11px] tabular-nums text-subtle">
-          {(m.currentBooking ?? m.lastBooking).id} · {(m.currentBooking ?? m.lastBooking).customer}
+        <p className="mt-1 truncate text-[13px] font-medium text-foreground">{job.service}</p>
+        <p className="mt-0.5 truncate text-[11px] tabular-nums text-muted">
+          {job.id} · {job.customer}
         </p>
       </div>
     </button>
@@ -98,6 +105,8 @@ function MechanicCard({ m, onOpen }: { m: Mechanic; onOpen: () => void }) {
 }
 
 function DetailPanel({ m, onClose }: { m: Mechanic; onClose: () => void }) {
+  const { openNewBooking } = useOps();
+
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();
@@ -168,7 +177,7 @@ function DetailPanel({ m, onClose }: { m: Mechanic; onClose: () => void }) {
             </div>
           ) : null}
 
-          <dl className="divide-y divide-border">
+          <dl className="space-y-3.5 px-5 py-4">
             {[
               ["Status", mechanicStatusLabel[m.status]],
               ["Zone", m.zone],
@@ -176,7 +185,7 @@ function DetailPanel({ m, onClose }: { m: Mechanic; onClose: () => void }) {
               ["Last job", `${m.lastBooking.service} · ${m.lastBooking.id}`],
               ["Specialties", m.specialties.join(", ")],
             ].map(([k, v]) => (
-              <div key={k} className="flex items-start justify-between gap-6 px-5 py-3">
+              <div key={k} className="flex items-start justify-between gap-6">
                 <dt className="shrink-0 text-xs text-subtle">{k}</dt>
                 <dd className="text-right text-[13px] font-medium text-foreground">{v}</dd>
               </div>
@@ -185,11 +194,16 @@ function DetailPanel({ m, onClose }: { m: Mechanic; onClose: () => void }) {
         </div>
 
         <footer className="flex items-center gap-2 border-t border-border px-5 py-3">
-          <PrimaryButton>Assign job</PrimaryButton>
-          <GhostButton>
+          <PrimaryButton onClick={() => openNewBooking({ mechanic: m.name })}>
+            Assign job
+          </PrimaryButton>
+          <a
+            href={phoneHref(m.phone)}
+            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-surface px-3 text-xs font-medium text-muted hover:bg-surface-3 hover:text-foreground"
+          >
             <Phone size={13} strokeWidth={1.5} />
             Call
-          </GhostButton>
+          </a>
         </footer>
       </aside>
     </div>
@@ -197,6 +211,7 @@ function DetailPanel({ m, onClose }: { m: Mechanic; onClose: () => void }) {
 }
 
 function MechanicsContentInner() {
+  const { openInviteMechanic } = useOps();
   const searchParams = useSearchParams();
   const [filter, setFilter] = useState<MechanicStatus | "all">("all");
   const [query, setQuery] = useState(searchParams.get("q") ?? "");
@@ -238,6 +253,8 @@ function MechanicsContentInner() {
     load();
   }, [load]);
 
+  useOpsRefresh(load);
+
   const empty = !loading && !error && counts.all === 0;
 
   return (
@@ -246,7 +263,19 @@ function MechanicsContentInner() {
       subtitle={`${counts.available} available · ${counts.on_job} on job · ${counts.offline} offline`}
       actions={
         <>
-          <div className="inline-flex items-center gap-0.5 rounded-lg bg-surface-3 p-0.5">
+          <select
+            value={filter}
+            onChange={(e) => setFilter(e.target.value as MechanicStatus | "all")}
+            className="h-8 rounded-lg border border-border bg-surface px-2.5 text-xs font-medium text-foreground md:hidden"
+          >
+            {FILTERS.map((f) => (
+              <option key={f.key} value={f.key}>
+                {f.label} ({f.key === "all" ? counts.all : counts[f.key]})
+              </option>
+            ))}
+          </select>
+
+          <div className="hidden items-center gap-0.5 rounded-lg bg-surface-3 p-0.5 md:inline-flex">
             {FILTERS.map((f) => (
               <button
                 key={f.key}
@@ -268,7 +297,7 @@ function MechanicsContentInner() {
             ))}
           </div>
 
-          <div className="relative">
+          <div className="relative min-w-0 flex-1 sm:flex-none">
             <Search
               size={14}
               strokeWidth={1.5}
@@ -277,12 +306,18 @@ function MechanicsContentInner() {
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search name or zone…"
-              className="h-8 w-52 rounded-lg border border-border bg-surface pl-8 pr-3 text-xs text-foreground placeholder:text-subtle focus:border-accent-ring focus:outline-none focus:ring-2 focus:ring-accent-ring/40"
+              placeholder="Search…"
+              className="h-8 w-full rounded-lg border border-border bg-surface pl-8 pr-3 text-xs text-foreground placeholder:text-subtle focus:border-accent-ring focus:outline-none focus:ring-2 focus:ring-accent-ring/40 sm:w-52"
             />
           </div>
 
-          <div className="ml-auto inline-flex items-center gap-0.5 rounded-lg bg-surface-3 p-0.5">
+          <SoftButton onClick={openInviteMechanic} className="ml-auto">
+            <Plus size={14} strokeWidth={2} />
+            <span className="hidden sm:inline">Add mechanic</span>
+            <span className="sm:hidden">Add</span>
+          </SoftButton>
+
+          <div className="inline-flex items-center gap-0.5 rounded-lg bg-surface-3 p-0.5">
             <button
               onClick={() => setView("grid")}
               aria-label="Grid view"
@@ -311,11 +346,11 @@ function MechanicsContentInner() {
         </>
       }
     >
-      <div className="mx-auto max-w-[1320px]">
+      <div className="mx-auto max-w-none">
         {loading ? (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
             {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="rounded-xl border border-border bg-surface p-4">
+              <div key={i} className="rounded-xl border border-border bg-surface p-4 shadow-card">
                 <div className="flex items-center gap-3">
                   <Skeleton className="h-11 w-11 rounded-full" />
                   <div className="flex-1">
@@ -345,12 +380,12 @@ function MechanicsContentInner() {
               title={empty ? "No mechanics onboarded" : "No mechanics match this view"}
               body={
                 empty
-                  ? "Invite your first mechanic to start dispatching roadside jobs."
+                  ? "Add your first mechanic to start dispatching roadside jobs."
                   : "Try a different status filter or clear the search."
               }
               action={
                 empty ? (
-                  <PrimaryButton>Invite mechanic</PrimaryButton>
+                  <PrimaryButton onClick={openInviteMechanic}>Add mechanic</PrimaryButton>
                 ) : (
                   <GhostButton
                     onClick={() => {
@@ -438,7 +473,7 @@ function MechanicsContentInner() {
 function MechanicsLoadingFallback() {
   return (
     <AppLayout title="Mechanics" subtitle="Loading…">
-      <div className="mx-auto max-w-[1320px]">
+      <div className="mx-auto max-w-none">
         <Skeleton className="h-64 w-full rounded-xl" />
       </div>
     </AppLayout>

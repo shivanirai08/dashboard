@@ -52,6 +52,21 @@ export function endOfDay(date: Date): Date {
   return copy;
 }
 
+/** Percent change current vs previous, 1 decimal. Null when both periods are empty. */
+export function pctChange(current: number, previous: number): number | null {
+  if (previous === 0) {
+    if (current === 0) return null;
+    return 100;
+  }
+  return Math.round(((current - previous) / previous) * 1000) / 10;
+}
+
+export function daysAgoStart(days: number, from = new Date()): Date {
+  const d = startOfDay(from);
+  d.setDate(d.getDate() - days);
+  return d;
+}
+
 export type BookingWithRelations = {
   id: string;
   bookingNumber: string;

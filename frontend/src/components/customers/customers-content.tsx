@@ -26,12 +26,16 @@ import {
   Initials,
   Panel,
   PrimaryButton,
+  SoftButton,
   Skeleton,
   Trend,
 } from "@/components/ui";
+import { useOps } from "@/components/providers/ops-provider";
 import { api } from "@/lib/api";
 import { money } from "@/lib/format";
+import { downloadCsv, mailHref, phoneHref } from "@/lib/export";
 import { useDebounce } from "@/hooks/use-debounce";
+import { useOpsRefresh } from "@/hooks/use-ops-refresh";
 import type { Customer } from "@/types";
 
 type SortKey = "name" | "bookingsCount" | "totalSpent" | "joinedAt";
@@ -71,6 +75,8 @@ function SortHeader({
 }
 
 function CustomerDrawer({ customer, onClose }: { customer: Customer; onClose: () => void }) {
+  const { openNewBooking } = useOps();
+
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();
@@ -121,20 +127,27 @@ function CustomerDrawer({ customer, onClose }: { customer: Customer; onClose: ()
           </div>
 
           <div className="flex items-center gap-3 border-b border-border px-5 py-4">
-            <div className="min-w-0 flex-1">
-              <p className="inline-flex items-center gap-1.5 text-xs text-muted">
-                <Phone size={12} strokeWidth={1.5} />
-                {customer.phone}
+            <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+              <p className="flex items-center gap-2 text-xs text-muted">
+                <Phone size={12} strokeWidth={1.5} className="shrink-0 text-subtle" />
+                <span className="truncate">{customer.phone}</span>
               </p>
-              <p className="mt-1 inline-flex items-center gap-1.5 text-xs text-muted">
-                <Mail size={12} strokeWidth={1.5} />
-                {customer.email}
-              </p>
+              {customer.email ? (
+                <p className="flex items-center gap-2 text-xs text-muted">
+                  <Mail size={12} strokeWidth={1.5} className="shrink-0 text-subtle" />
+                  <span className="truncate">{customer.email}</span>
+                </p>
+              ) : null}
             </div>
-            <GhostButton>Contact</GhostButton>
+            <a
+              href={customer.email ? mailHref(customer.email) : phoneHref(customer.phone)}
+              className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-border bg-surface px-3 text-xs font-medium text-muted hover:bg-surface-3 hover:text-foreground"
+            >
+              Contact
+            </a>
           </div>
 
-          <dl className="divide-y divide-border">
+          <dl className="space-y-3.5 px-5 py-4">
             {[
               ["Zone", customer.zone],
               ["Member since", customer.joinedAt],
@@ -144,20 +157,20 @@ function CustomerDrawer({ customer, onClose }: { customer: Customer; onClose: ()
               ],
               ["Last booking date", customer.lastBooking.date],
             ].map(([k, v]) => (
-              <div key={k} className="flex items-start justify-between gap-6 px-5 py-3">
+              <div key={k} className="flex items-start justify-between gap-6">
                 <dt className="shrink-0 text-xs text-subtle">{k}</dt>
                 <dd className="text-right text-[13px] font-medium text-foreground">{v}</dd>
               </div>
             ))}
           </dl>
 
-          <div className="border-t border-border px-5 py-4">
+          <div className="px-5 pb-5 pt-1">
             <p className="text-xs font-medium text-subtle">Saved vehicles</p>
             <ul className="mt-3 space-y-2">
               {customer.vehicles.map((v) => (
                 <li
                   key={v}
-                  className="flex items-center gap-2 rounded-lg bg-surface-2 px-3 py-2 text-[13px] text-muted"
+                  className="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2.5 text-[13px] text-muted shadow-card"
                 >
                   <Car size={13} strokeWidth={1.5} className="text-subtle" />
                   {v}
@@ -168,7 +181,16 @@ function CustomerDrawer({ customer, onClose }: { customer: Customer; onClose: ()
         </div>
 
         <footer className="flex items-center gap-2 border-t border-border px-5 py-3">
-          <PrimaryButton>
+          <PrimaryButton
+            onClick={() =>
+              openNewBooking({
+                customerName: customer.name,
+                phone: customer.phone,
+                email: customer.email,
+                zone: customer.zone,
+              })
+            }
+          >
             <Plus size={14} strokeWidth={2} />
             New booking
           </PrimaryButton>
@@ -185,6 +207,7 @@ function CustomerDrawer({ customer, onClose }: { customer: Customer; onClose: ()
 }
 
 export default function CustomersContent() {
+  const { openAddCustomer } = useOps();
   const [query, setQuery] = useState("");
   const debouncedQuery = useDebounce(query);
   const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({
@@ -201,6 +224,11 @@ export default function CustomersContent() {
     totalCustomers: 0,
     totalBookings: 0,
     avgLifetimeValue: 0,
+    deltas: {
+      totalCustomers: null as number | null,
+      totalBookings: null as number | null,
+      avgLifetimeValue: null as number | null,
+    },
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -229,6 +257,8 @@ export default function CustomersContent() {
   useEffect(() => {
     load();
   }, [load]);
+
+  useOpsRefresh(load);
 
   const pageRows = rows;
   const pages = totalPages;
@@ -279,31 +309,52 @@ export default function CustomersContent() {
           ) : null}
 
           <div className="ml-auto flex items-center gap-2">
-            <GhostButton>
+            <GhostButton
+              onClick={() =>
+                downloadCsv(
+                  "customers.csv",
+                  rows.map((c) => ({
+                    id: c.id,
+                    name: c.name,
+                    phone: c.phone,
+                    email: c.email,
+                    zone: c.zone,
+                    bookings: c.bookingsCount,
+                    lifetimeValue: c.totalSpent,
+                    joinedAt: c.joinedAt,
+                  })),
+                )
+              }
+            >
               <Download size={13} strokeWidth={1.5} />
-              Export
+              <span className="hidden sm:inline">Export</span>
             </GhostButton>
-            <PrimaryButton>
+            <SoftButton onClick={openAddCustomer}>
               <Plus size={14} strokeWidth={2} />
-              Add customer
-            </PrimaryButton>
+              <span className="hidden sm:inline">Add customer</span>
+              <span className="sm:hidden">Add</span>
+            </SoftButton>
           </div>
         </>
       }
     >
-      <div className="mx-auto flex max-w-[1320px] flex-col gap-5">
-        <div className="grid grid-cols-1 gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-3">
+      <div className="mx-auto flex max-w-none flex-col gap-5">
+        <div className="grid grid-cols-1 gap-px overflow-hidden rounded-xl border border-border bg-border shadow-card sm:grid-cols-3">
           {[
-            { label: "Total customers", value: summary.totalCustomers.toLocaleString("en-IN"), delta: 9.6 },
+            {
+              label: "Total customers",
+              value: summary.totalCustomers.toLocaleString("en-IN"),
+              delta: summary.deltas.totalCustomers,
+            },
             {
               label: "Total bookings",
               value: summary.totalBookings.toLocaleString("en-IN"),
-              delta: 8.4,
+              delta: summary.deltas.totalBookings,
             },
             {
               label: "Avg lifetime value",
               value: money(summary.avgLifetimeValue),
-              delta: 5.2,
+              delta: summary.deltas.avgLifetimeValue,
             },
           ].map((s) => (
             <div key={s.label} className="bg-surface px-5 py-4">
@@ -348,7 +399,7 @@ export default function CustomersContent() {
               }
               action={
                 empty ? (
-                  <PrimaryButton>
+                  <PrimaryButton onClick={openAddCustomer}>
                     <Plus size={14} strokeWidth={2} />
                     Add customer
                   </PrimaryButton>

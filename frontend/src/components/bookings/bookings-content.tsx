@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowDown,
@@ -31,9 +31,12 @@ import {
   Skeleton,
   StatusPill,
 } from "@/components/ui";
+import { useOps } from "@/components/providers/ops-provider";
 import { api, type StatusCounts } from "@/lib/api";
 import { money, statusLabel } from "@/lib/format";
+import { downloadCsv, phoneHref } from "@/lib/export";
 import { useDebounce } from "@/hooks/use-debounce";
+import { useOpsRefresh } from "@/hooks/use-ops-refresh";
 import type { Booking, BookingStatus } from "@/types";
 
 type SortKey = "id" | "customer" | "service" | "mechanic" | "amount" | "date";
@@ -116,13 +119,19 @@ function BookingDrawer({
   onPrev,
   onNext,
   position,
+  onReassigned,
 }: {
   booking: Booking;
   onClose: () => void;
   onPrev: () => void;
   onNext: () => void;
   position: string;
+  onReassigned: () => void;
 }) {
+  const [mechanics, setMechanics] = useState<string[]>([]);
+  const [reassignOpen, setReassignOpen] = useState(false);
+  const [reassigning, setReassigning] = useState(false);
+
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();
@@ -132,6 +141,25 @@ function BookingDrawer({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose, onNext, onPrev]);
+
+  useEffect(() => {
+    if (!reassignOpen) return;
+    api
+      .getBookingFilters()
+      .then((f) => setMechanics(f.mechanics))
+      .catch(() => {});
+  }, [reassignOpen]);
+
+  async function reassign(mechanic: string) {
+    setReassigning(true);
+    try {
+      await api.reassignBooking(booking.id, mechanic);
+      setReassignOpen(false);
+      onReassigned();
+    } finally {
+      setReassigning(false);
+    }
+  }
 
   return (
     <div className="fixed inset-0 z-50">
@@ -165,7 +193,7 @@ function BookingDrawer({
             </button>
           </div>
           <div className="mt-3 flex items-center gap-2.5">
-            <h2 className="text-[15px] font-semibold tracking-tight text-foreground">{booking.id}</h2>
+            <h2 className="text-base font-semibold tracking-tight text-foreground">{booking.id}</h2>
             <StatusPill status={booking.status} />
           </div>
           <p className="mt-1 text-xs text-subtle">
@@ -176,17 +204,22 @@ function BookingDrawer({
         <div className="flex-1 overflow-y-auto">
           <div className="flex items-center gap-3 border-b border-border px-5 py-4">
             <Initials name={booking.customer} />
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="text-[13px] font-medium text-foreground">{booking.customer}</p>
               <p className="mt-0.5 inline-flex items-center gap-1.5 text-xs text-muted">
                 <Phone size={12} strokeWidth={1.5} />
                 {booking.phone}
               </p>
             </div>
-            <GhostButton>Call</GhostButton>
+            <a
+              href={phoneHref(booking.phone)}
+              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-surface px-3 text-xs font-medium text-muted hover:bg-surface-3 hover:text-foreground"
+            >
+              Call
+            </a>
           </div>
 
-          <dl className="divide-y divide-border">
+          <dl className="space-y-3.5 px-5 py-4">
             {[
               ["Service", booking.service],
               ["Vehicle", `${booking.vehicle} · ${booking.plate}`],
@@ -194,40 +227,38 @@ function BookingDrawer({
               ["Pickup zone", booking.location],
               ["Amount", money(booking.amount)],
             ].map(([k, v]) => (
-              <div key={k} className="flex items-start justify-between gap-6 px-5 py-3">
+              <div key={k} className="flex items-start justify-between gap-6">
                 <dt className="text-xs text-subtle">{k}</dt>
                 <dd className="text-right text-[13px] font-medium text-foreground">{v}</dd>
               </div>
             ))}
           </dl>
-
-          <div className="px-5 py-4">
-            <p className="text-xs font-medium text-subtle">Timeline</p>
-            <ul className="mt-3">
-              {[
-                ["Request received", booking.time],
-                ["Mechanic assigned", "+4 min"],
-                ["En route", "+9 min"],
-                ["On site", "+26 min"],
-              ].map(([k, v], i, arr) => (
-                <li key={k} className="relative flex gap-3 pb-3.5 last:pb-0">
-                  {i < arr.length - 1 ? (
-                    <span className="absolute left-1 top-3 h-full w-px bg-border" />
-                  ) : null}
-                  <span className="relative mt-1.5 h-2 w-2 shrink-0 rounded-full bg-accent" />
-                  <div className="flex flex-1 items-baseline justify-between">
-                    <span className="text-[13px] text-foreground">{k}</span>
-                    <span className="text-[11px] tabular-nums text-subtle">{v}</span>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </div>
         </div>
 
-        <footer className="flex items-center gap-2 border-t border-border px-5 py-3">
-          <PrimaryButton>Reassign mechanic</PrimaryButton>
-          <GhostButton>Contact customer</GhostButton>
+        <footer className="relative flex items-center gap-2 border-t border-border px-5 py-3">
+          <PrimaryButton onClick={() => setReassignOpen((v) => !v)} disabled={reassigning}>
+            {booking.mechanic ? "Reassign mechanic" : "Assign mechanic"}
+          </PrimaryButton>
+          <a
+            href={phoneHref(booking.phone)}
+            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-surface px-3 text-xs font-medium text-muted hover:bg-surface-3 hover:text-foreground"
+          >
+            Contact customer
+          </a>
+          {reassignOpen ? (
+            <div className="absolute bottom-14 left-5 z-10 max-h-56 w-64 overflow-y-auto rounded-xl border border-border bg-surface p-2 shadow-panel">
+              {mechanics.map((m) => (
+                <button
+                  key={m}
+                  disabled={reassigning}
+                  onClick={() => reassign(m)}
+                  className="flex w-full rounded-md px-2.5 py-2 text-left text-[13px] text-muted hover:bg-surface-3 hover:text-foreground"
+                >
+                  {m}
+                </button>
+              ))}
+            </div>
+          ) : null}
         </footer>
       </aside>
     </div>
@@ -235,6 +266,7 @@ function BookingDrawer({
 }
 
 function BookingsContentInner() {
+  const { openNewBooking } = useOps();
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
@@ -243,7 +275,6 @@ function BookingsContentInner() {
   const debouncedQuery = useDebounce(query);
   const [status, setStatus] = useState<string>(searchParams.get("status") ?? "all");
   const [service, setService] = useState<string>("all");
-  const [mechanic, setMechanic] = useState<string>("all");
   const [range, setRange] = useState<string>("30d");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({
@@ -258,7 +289,6 @@ function BookingsContentInner() {
   const [totalPages, setTotalPages] = useState(1);
   const [counts, setCounts] = useState<StatusCounts>({ all: 0 });
   const [services, setServices] = useState<string[]>([]);
-  const [mechanicNames, setMechanicNames] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
@@ -270,16 +300,42 @@ function BookingsContentInner() {
     else setStatus("all");
   }, [searchParams]);
 
-  useEffect(() => {
+  const loadMeta = useCallback(() => {
     api.getBookingStatusCounts().then(setCounts).catch(() => {});
     api
       .getBookingFilters()
       .then((filters) => {
         setServices(filters.services);
-        setMechanicNames(filters.mechanics);
       })
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    loadMeta();
+  }, [loadMeta]);
+
+  const reload = useCallback(() => {
+    setError(false);
+    setLoading(true);
+    api
+      .getBookings({
+        q: debouncedQuery || undefined,
+        status,
+        service,
+        sort: sort.key,
+        dir: sort.dir,
+        page,
+        limit: PAGE_SIZE,
+      })
+      .then((result) => {
+        setRows(result.data);
+        setTotal(result.meta.total);
+        setTotalPages(result.meta.totalPages);
+      })
+      .catch(() => setError(true))
+      .finally(() => setLoading(false));
+    loadMeta();
+  }, [debouncedQuery, status, service, sort, page, loadMeta]);
 
   useEffect(() => {
     setLoading(true);
@@ -289,7 +345,6 @@ function BookingsContentInner() {
         q: debouncedQuery || undefined,
         status,
         service,
-        mechanic,
         sort: sort.key,
         dir: sort.dir,
         page,
@@ -302,34 +357,13 @@ function BookingsContentInner() {
       })
       .catch(() => setError(true))
       .finally(() => setLoading(false));
-  }, [debouncedQuery, status, service, mechanic, sort, page]);
+  }, [debouncedQuery, status, service, sort, page]);
 
-  const reload = () => {
-    setError(false);
-    setLoading(true);
-    api
-      .getBookings({
-        q: debouncedQuery || undefined,
-        status,
-        service,
-        mechanic,
-        sort: sort.key,
-        dir: sort.dir,
-        page,
-        limit: PAGE_SIZE,
-      })
-      .then((result) => {
-        setRows(result.data);
-        setTotal(result.meta.total);
-        setTotalPages(result.meta.totalPages);
-      })
-      .catch(() => setError(true))
-      .finally(() => setLoading(false));
-  };
+  useOpsRefresh(reload);
 
   const pageRows = rows;
   const pages = totalPages;
-  const extraFilters = (service !== "all" ? 1 : 0) + (mechanic !== "all" ? 1 : 0);
+  const extraFilters = service !== "all" ? 1 : 0;
 
   const selectedIndex = rows.findIndex((b) => b.id === selectedId);
   const selected = selectedIndex >= 0 ? rows[selectedIndex] : null;
@@ -367,7 +401,6 @@ function BookingsContentInner() {
   function resetAll() {
     setStatus("all");
     setService("all");
-    setMechanic("all");
     setQuery("");
     setPage(0);
     router.replace(pathname);
@@ -381,7 +414,19 @@ function BookingsContentInner() {
       subtitle={`${total.toLocaleString("en-IN")} jobs · all zones`}
       actions={
         <>
-          <div className="flex items-center gap-0.5 overflow-x-auto rounded-lg bg-surface-3 p-0.5">
+          <select
+            value={status}
+            onChange={(e) => pickStatus(e.target.value)}
+            className="h-8 rounded-lg border border-border bg-surface px-2.5 text-xs font-medium text-foreground md:hidden"
+          >
+            {STATUS_TABS.map((s) => (
+              <option key={s} value={s}>
+                {s === "all" ? `All (${counts.all ?? 0})` : `${statusLabel[s as BookingStatus]} (${counts[s] ?? 0})`}
+              </option>
+            ))}
+          </select>
+
+          <div className="hidden items-center gap-0.5 overflow-x-auto rounded-lg bg-surface-3 p-0.5 md:flex">
             {STATUS_TABS.map((s) => (
               <button
                 key={s}
@@ -401,7 +446,7 @@ function BookingsContentInner() {
             ))}
           </div>
 
-          <div className="relative">
+          <div className="relative min-w-0 flex-1 sm:flex-none">
             <Search
               size={14}
               strokeWidth={1.5}
@@ -413,8 +458,8 @@ function BookingsContentInner() {
                 setQuery(e.target.value);
                 setPage(0);
               }}
-              placeholder="Search ID, customer, plate…"
-              className="h-8 w-56 rounded-lg border border-border bg-surface pl-8 pr-3 text-xs text-foreground placeholder:text-subtle focus:border-accent-ring focus:outline-none focus:ring-2 focus:ring-accent-ring/40"
+              placeholder="Search ID, customer, mechanic…"
+              className="h-8 w-full rounded-lg border border-border bg-surface pl-8 pr-3 text-xs text-foreground placeholder:text-subtle focus:border-accent-ring focus:outline-none focus:ring-2 focus:ring-accent-ring/40 sm:w-52"
             />
           </div>
 
@@ -429,7 +474,7 @@ function BookingsContentInner() {
               }
             >
               <ListFilter size={13} strokeWidth={1.5} />
-              Filters
+              <span className="hidden sm:inline">Filters</span>
               {extraFilters > 0 ? (
                 <span className="rounded bg-accent px-1 text-[10px] font-semibold text-white">
                   {extraFilters}
@@ -441,7 +486,7 @@ function BookingsContentInner() {
             {filtersOpen ? (
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setFiltersOpen(false)} />
-                <div className="absolute left-0 top-9 z-50 w-72 rounded-xl border border-border bg-surface p-3 shadow-panel">
+                <div className="absolute right-0 top-9 z-50 w-72 rounded-xl border border-border bg-surface p-3 shadow-panel sm:left-0 sm:right-auto">
                   <p className="px-2 pb-1 text-[11px] font-medium text-subtle">Date range</p>
                   <div className="flex gap-1 px-1 pb-3">
                     {RANGES.map((r) => (
@@ -451,7 +496,7 @@ function BookingsContentInner() {
                         className={
                           "flex-1 rounded-md px-2 py-1.5 text-[11px] font-medium " +
                           (range === r.value
-                            ? "bg-foreground text-white"
+                            ? "bg-foreground text-white dark:text-canvas"
                             : "bg-surface-3 text-muted hover:text-foreground")
                         }
                       >
@@ -482,31 +527,6 @@ function BookingsContentInner() {
                       />
                     ))}
                   </div>
-
-                  <p className="border-t border-border px-2 pb-1 pt-2 text-[11px] font-medium text-subtle">
-                    Mechanic
-                  </p>
-                  <div className="max-h-40 overflow-y-auto">
-                    <OptionRow
-                      label="All mechanics"
-                      selected={mechanic === "all"}
-                      onClick={() => {
-                        setMechanic("all");
-                        setPage(0);
-                      }}
-                    />
-                    {mechanicNames.map((m) => (
-                      <OptionRow
-                        key={m}
-                        label={m}
-                        selected={mechanic === m}
-                        onClick={() => {
-                          setMechanic(m);
-                          setPage(0);
-                        }}
-                      />
-                    ))}
-                  </div>
                 </div>
               </>
             ) : null}
@@ -518,24 +538,40 @@ function BookingsContentInner() {
               className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium text-accent hover:bg-accent-soft"
             >
               <X size={12} strokeWidth={2} />
-              Reset
+              <span className="hidden sm:inline">Reset</span>
             </button>
           ) : null}
 
-          <div className="ml-auto flex items-center gap-2">
-            <GhostButton>
+          <div className="ml-auto">
+            <GhostButton
+              onClick={() =>
+                downloadCsv(
+                  "bookings.csv",
+                  rows.map((b) => ({
+                    id: b.id,
+                    customer: b.customer,
+                    phone: b.phone,
+                    vehicle: b.vehicle,
+                    plate: b.plate,
+                    service: b.service,
+                    mechanic: b.mechanic,
+                    status: b.status,
+                    amount: b.amount,
+                    date: b.date,
+                    time: b.time,
+                    location: b.location,
+                  })),
+                )
+              }
+            >
               <Download size={13} strokeWidth={1.5} />
-              Export
+              <span className="hidden sm:inline">Export</span>
             </GhostButton>
-            <PrimaryButton>
-              <Plus size={14} strokeWidth={2} />
-              New booking
-            </PrimaryButton>
           </div>
         </>
       }
     >
-      <div className="mx-auto max-w-[1320px]">
+      <div className="mx-auto max-w-none">
         <Panel className="overflow-hidden">
           {loading ? (
             <div className="divide-y divide-border">
@@ -566,11 +602,11 @@ function BookingsContentInner() {
               body={
                 empty
                   ? "When a customer requests roadside help, the job appears here within seconds."
-                  : "Try a wider date range, or clear the status and mechanic filters."
+                  : "Try a wider date range, or clear the status and service filters."
               }
               action={
                 empty ? (
-                  <PrimaryButton>
+                  <PrimaryButton onClick={() => openNewBooking()}>
                     <Plus size={14} strokeWidth={2} />
                     Create booking
                   </PrimaryButton>
@@ -738,6 +774,7 @@ function BookingsContentInner() {
           onPrev={() => step(-1)}
           onNext={() => step(1)}
           position={`${selectedIndex + 1} of ${total}`}
+          onReassigned={reload}
         />
       ) : null}
     </AppLayout>
@@ -747,7 +784,7 @@ function BookingsContentInner() {
 function BookingsLoadingFallback() {
   return (
     <AppLayout title="Bookings" subtitle="Loading…">
-      <div className="mx-auto max-w-[1320px]">
+      <div className="mx-auto max-w-none">
         <Panel className="overflow-hidden p-8">
           <Skeleton className="h-64 w-full" />
         </Panel>

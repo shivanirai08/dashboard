@@ -326,7 +326,7 @@ export const openApiSpec = {
           key: { type: "string", example: "total" },
           label: { type: "string", example: "Total bookings" },
           value: { type: "string", example: "520" },
-          delta: { type: "number", example: 8.4 },
+          delta: { type: "number", nullable: true, example: 8.4, description: "Period-over-period % change, or null when unavailable" },
           icon: {
             type: "string",
             enum: ["calendar", "clock", "check", "hourglass", "x", "revenue", "wrench", "users"],

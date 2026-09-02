@@ -1,4 +1,4 @@
-import { formatMoney } from "../../lib/formatters.js";
+import { formatMoney, pctChange } from "../../lib/formatters.js";
 import { buildBookingSeries } from "../../lib/series.js";
 import {
   analyticsRepository,
@@ -12,13 +12,16 @@ export const analyticsService = {
   async getAnalytics(rangeParam?: string) {
     const days = parseAnalyticsRange(rangeParam);
     const { start, end } = analyticsRepository.dateRangeForDays(days);
+    const { start: prevStart, end: prevEnd } = analyticsRepository.previousRange(start, days);
 
-    const [bookingsInRange, statusBreakdown, serviceGroups, series] = await Promise.all([
-      analyticsRepository.findBookingsInRange(start, end),
-      analyticsRepository.groupBookingsByStatusInRange(start, end),
-      analyticsRepository.groupBookingsByService(start, end, 8),
-      buildBookingSeries(days),
-    ]);
+    const [bookingsInRange, prevBookings, statusBreakdown, serviceGroups, series] =
+      await Promise.all([
+        analyticsRepository.findBookingsInRange(start, end),
+        analyticsRepository.findBookingsInRange(prevStart, prevEnd),
+        analyticsRepository.groupBookingsByStatusInRange(start, end),
+        analyticsRepository.groupBookingsByService(start, end, 8),
+        buildBookingSeries(days),
+      ]);
 
     const services = await analyticsRepository.findServicesByIds(
       serviceGroups.map((row) => row.serviceId),
@@ -26,15 +29,26 @@ export const analyticsService = {
     const serviceNameById = new Map(services.map((service) => [service.id, service.name]));
 
     const totals = sumBookingTotals(bookingsInRange);
+    const prevTotals = sumBookingTotals(prevBookings);
+
+    const completionRate = totals.bookings
+      ? Math.round((totals.completed / totals.bookings) * 100)
+      : 0;
+    const prevCompletionRate = prevTotals.bookings
+      ? Math.round((prevTotals.completed / prevTotals.bookings) * 100)
+      : 0;
 
     return {
       range: rangeLabel(days),
       totals: {
         bookings: totals.bookings,
         revenue: totals.revenue,
-        completionRate: totals.bookings
-          ? Math.round((totals.completed / totals.bookings) * 100)
-          : 0,
+        completionRate,
+        deltas: {
+          bookings: pctChange(totals.bookings, prevTotals.bookings),
+          revenue: pctChange(totals.revenue, prevTotals.revenue),
+          completionRate: pctChange(completionRate, prevCompletionRate),
+        },
       },
       series,
       statusBreakdown: statusBreakdown.map((row) => ({

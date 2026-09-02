@@ -31,4 +31,14 @@ export const bookingsController = {
     const booking = await bookingsService.getById(paramAsString(req.params.id));
     res.json(booking);
   },
+
+  async create(req: Request, res: Response) {
+    const booking = await bookingsService.create(req.body ?? {});
+    res.status(201).json(booking);
+  },
+
+  async reassign(req: Request, res: Response) {
+    const booking = await bookingsService.reassign(paramAsString(req.params.id), req.body ?? {});
+    res.json(booking);
+  },
 };

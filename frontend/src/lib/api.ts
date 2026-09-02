@@ -20,18 +20,30 @@ export class ApiError extends Error {
 
 type QueryParams = Record<string, string | number | undefined>;
 
-async function apiFetch<T>(path: string, params?: QueryParams): Promise<T> {
+async function apiFetch<T>(
+  path: string,
+  options?: {
+    params?: QueryParams;
+    method?: string;
+    body?: unknown;
+  },
+): Promise<T> {
   const url = new URL(path, API_URL);
 
-  if (params) {
-    for (const [key, value] of Object.entries(params)) {
+  if (options?.params) {
+    for (const [key, value] of Object.entries(options.params)) {
       if (value !== undefined && value !== "") {
         url.searchParams.set(key, String(value));
       }
     }
   }
 
-  const res = await fetch(url.toString(), { cache: "no-store" });
+  const res = await fetch(url.toString(), {
+    method: options?.method ?? "GET",
+    cache: "no-store",
+    headers: options?.body ? { "Content-Type": "application/json" } : undefined,
+    body: options?.body ? JSON.stringify(options.body) : undefined,
+  });
 
   if (!res.ok) {
     const body = (await res.json().catch(() => ({}))) as { error?: string };
@@ -61,6 +73,11 @@ export type AnalyticsData = {
     bookings: number;
     revenue: number;
     completionRate: number;
+    deltas: {
+      bookings: number | null;
+      revenue: number | null;
+      completionRate: number | null;
+    };
   };
   series: SeriesPoint[];
   statusBreakdown: { key: string; name: string; value: number }[];
@@ -99,14 +116,46 @@ export type CustomerListResponse = {
     totalCustomers: number;
     totalBookings: number;
     avgLifetimeValue: number;
+    deltas: {
+      totalCustomers: number | null;
+      totalBookings: number | null;
+      avgLifetimeValue: number | null;
+    };
   };
+};
+
+export type CreateBookingPayload = {
+  customerName: string;
+  phone: string;
+  email?: string;
+  zone?: string;
+  vehicle: string;
+  plate: string;
+  service: string;
+  location: string;
+  mechanic?: string;
+  amount?: number;
+};
+
+export type CreateCustomerPayload = {
+  name: string;
+  phone: string;
+  email?: string;
+  zone?: string;
+};
+
+export type CreateMechanicPayload = {
+  name: string;
+  phone: string;
+  zone: string;
+  specialties?: string[];
 };
 
 export const api = {
   getDashboard: () => apiFetch<DashboardOverview>("/api/dashboard"),
 
   getAnalytics: (range: "7d" | "30d" | "90d") =>
-    apiFetch<AnalyticsData>("/api/analytics", { range }),
+    apiFetch<AnalyticsData>("/api/analytics", { params: { range } }),
 
   getBookings: (params: {
     q?: string;
@@ -119,14 +168,25 @@ export const api = {
     limit?: number;
   }) =>
     apiFetch<BookingListResponse>("/api/bookings", {
-      q: params.q,
-      status: params.status === "all" ? undefined : params.status,
-      service: params.service === "all" ? undefined : params.service,
-      mechanic: params.mechanic === "all" ? undefined : params.mechanic,
-      sort: params.sort,
-      dir: params.dir,
-      page: params.page,
-      limit: params.limit,
+      params: {
+        q: params.q,
+        status: params.status === "all" ? undefined : params.status,
+        service: params.service === "all" ? undefined : params.service,
+        mechanic: params.mechanic === "all" ? undefined : params.mechanic,
+        sort: params.sort,
+        dir: params.dir,
+        page: params.page,
+        limit: params.limit,
+      },
+    }),
+
+  createBooking: (body: CreateBookingPayload) =>
+    apiFetch<Booking>("/api/bookings", { method: "POST", body }),
+
+  reassignBooking: (id: string, mechanic: string) =>
+    apiFetch<Booking>(`/api/bookings/${encodeURIComponent(id)}/reassign`, {
+      method: "PATCH",
+      body: { mechanic },
     }),
 
   getBookingStatusCounts: () => apiFetch<StatusCounts>("/api/bookings/meta/counts"),
@@ -135,9 +195,14 @@ export const api = {
 
   getMechanics: (params?: { q?: string; status?: string }) =>
     apiFetch<MechanicListResponse>("/api/mechanics", {
-      q: params?.q,
-      status: params?.status === "all" ? undefined : params?.status,
+      params: {
+        q: params?.q,
+        status: params?.status === "all" ? undefined : params?.status,
+      },
     }),
+
+  createMechanic: (body: CreateMechanicPayload) =>
+    apiFetch<Mechanic>("/api/mechanics", { method: "POST", body }),
 
   getMechanicStatusCounts: () =>
     apiFetch<MechanicStatusCounts>("/api/mechanics/meta/counts"),
@@ -150,10 +215,15 @@ export const api = {
     limit?: number;
   }) =>
     apiFetch<CustomerListResponse>("/api/customers", {
-      q: params.q,
-      sort: params.sort,
-      dir: params.dir,
-      page: params.page,
-      limit: params.limit,
+      params: {
+        q: params.q,
+        sort: params.sort,
+        dir: params.dir,
+        page: params.page,
+        limit: params.limit,
+      },
     }),
+
+  createCustomer: (body: CreateCustomerPayload) =>
+    apiFetch<Customer>("/api/customers", { method: "POST", body }),
 };

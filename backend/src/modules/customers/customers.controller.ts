@@ -18,4 +18,9 @@ export const customersController = {
     const customer = await customersService.getById(paramAsString(req.params.id));
     res.json(customer);
   },
+
+  async create(req: Request, res: Response) {
+    const customer = await customersService.create(req.body ?? {});
+    res.status(201).json(customer);
+  },
 };

@@ -1,4 +1,4 @@
-import { BookingStatus, MechanicStatus } from "@prisma/client";
+import { BookingStatus, MechanicStatus } from "../../lib/enums.js";
 import { prisma } from "../../lib/prisma.js";
 import { bookingInclude, endOfDay, startOfDay } from "../../lib/formatters.js";
 
@@ -7,11 +7,31 @@ export const dashboardRepository = {
     return prisma.booking.count();
   },
 
+  countBookingsInRange(start: Date, end: Date) {
+    return prisma.booking.count({
+      where: { scheduledAt: { gte: start, lte: end } },
+    });
+  },
+
+  countBookingsByStatusInRange(status: BookingStatus, start: Date, end: Date) {
+    return prisma.booking.count({
+      where: { status, scheduledAt: { gte: start, lte: end } },
+    });
+  },
+
   countTodayBookings() {
     const todayStart = startOfDay(new Date());
     const todayEnd = endOfDay(todayStart);
     return prisma.booking.count({
       where: { scheduledAt: { gte: todayStart, lte: todayEnd } },
+    });
+  },
+
+  countYesterdayBookings() {
+    const yesterday = startOfDay(new Date());
+    yesterday.setDate(yesterday.getDate() - 1);
+    return prisma.booking.count({
+      where: { scheduledAt: { gte: yesterday, lte: endOfDay(yesterday) } },
     });
   },
 
@@ -29,14 +49,28 @@ export const dashboardRepository = {
     });
   },
 
+  aggregateCompletedRevenueInRange(start: Date, end: Date) {
+    return prisma.booking.aggregate({
+      where: {
+        status: BookingStatus.completed,
+        scheduledAt: { gte: start, lte: end },
+      },
+      _sum: { amount: true },
+    });
+  },
+
   countActiveMechanics() {
     return prisma.mechanic.count({
       where: { status: { in: [MechanicStatus.available, MechanicStatus.on_job] } },
     });
   },
 
-  countNewCustomers(since: Date) {
-    return prisma.customer.count({ where: { createdAt: { gte: since } } });
+  countNewCustomers(since: Date, until?: Date) {
+    return prisma.customer.count({
+      where: {
+        createdAt: until ? { gte: since, lte: until } : { gte: since },
+      },
+    });
   },
 
   findRecentBookings(limit: number) {

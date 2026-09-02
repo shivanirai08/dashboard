@@ -17,7 +17,8 @@ import {
   YAxis,
 } from "recharts";
 import type { SeriesPoint } from "@/types";
-import { chart } from "@/lib/theme";
+import { useChartTheme, type ChartColors } from "@/hooks/use-chart-theme";
+import { compactMoney, money } from "@/lib/format";
 
 type TipPayload = { payload?: SeriesPoint; value?: number }[];
 
@@ -51,26 +52,30 @@ function ChartTip({
         </>
       ) : (
         <p className="mt-1 text-sm font-semibold tabular-nums text-foreground">
-          ${p.revenue.toLocaleString("en-US")}
+          {money(p.revenue)}
         </p>
       )}
     </div>
   );
 }
 
-const axisCommon = {
-  tickLine: false,
-  axisLine: false,
-  tick: { fill: chart.subtle, fontSize: 11 },
-};
+function axisCommon(colors: ChartColors) {
+  return {
+    tickLine: false as const,
+    axisLine: false as const,
+    tick: { fill: colors.subtle, fontSize: 11 },
+  };
+}
 
 export function BookingsLine({ data }: { data: SeriesPoint[] }) {
+  const chart = useChartTheme();
+  const axis = axisCommon(chart);
   return (
     <ResponsiveContainer width="100%" height={260}>
       <LineChart data={data} margin={{ top: 8, right: 12, left: -18, bottom: 0 }}>
         <CartesianGrid stroke={chart.grid} vertical={false} />
-        <XAxis dataKey="label" interval={tickStep(data.length)} {...axisCommon} />
-        <YAxis width={48} {...axisCommon} />
+        <XAxis dataKey="label" interval={tickStep(data.length)} {...axis} />
+        <YAxis width={48} {...axis} />
         <Tooltip
           cursor={{ stroke: chart.border, strokeWidth: 1 }}
           content={<ChartTip unit="bookings" />}
@@ -98,6 +103,8 @@ export function BookingsLine({ data }: { data: SeriesPoint[] }) {
 }
 
 export function RevenueArea({ data }: { data: SeriesPoint[] }) {
+  const chart = useChartTheme();
+  const axis = axisCommon(chart);
   return (
     <ResponsiveContainer width="100%" height={260}>
       <AreaChart data={data} margin={{ top: 8, right: 12, left: -14, bottom: 0 }}>
@@ -108,11 +115,11 @@ export function RevenueArea({ data }: { data: SeriesPoint[] }) {
           </linearGradient>
         </defs>
         <CartesianGrid stroke={chart.grid} vertical={false} />
-        <XAxis dataKey="label" interval={tickStep(data.length)} {...axisCommon} />
+        <XAxis dataKey="label" interval={tickStep(data.length)} {...axis} />
         <YAxis
           width={54}
-          tickFormatter={(v: number) => "$" + Math.round(v / 1000) + "k"}
-          {...axisCommon}
+          tickFormatter={(v: number) => compactMoney(v)}
+          {...axis}
         />
         <Tooltip
           cursor={{ stroke: chart.border, strokeWidth: 1 }}
@@ -130,12 +137,24 @@ export function RevenueArea({ data }: { data: SeriesPoint[] }) {
   );
 }
 
+export function useStatusColors(): Record<string, string> {
+  const chart = useChartTheme();
+  return {
+    pending: chart.pending,
+    assigned: chart.assigned,
+    on_the_way: chart.onTheWay,
+    completed: chart.completed,
+    cancelled: chart.cancelled,
+  };
+}
+
+/** Static fallback for SSR/list legends; prefer useStatusColors in client charts. */
 export const statusColors: Record<string, string> = {
-  pending: chart.pending,
-  assigned: chart.assigned,
-  on_the_way: chart.onTheWay,
-  completed: chart.completed,
-  cancelled: chart.cancelled,
+  pending: "#f5a524",
+  assigned: "#175cd3",
+  on_the_way: "#4f46e5",
+  completed: "#0f7a56",
+  cancelled: "#b42318",
 };
 
 export function StatusDonut({
@@ -143,6 +162,8 @@ export function StatusDonut({
 }: {
   data: { key: string; name: string; value: number }[];
 }) {
+  const chart = useChartTheme();
+  const colors = useStatusColors();
   return (
     <ResponsiveContainer width="100%" height={240}>
       <PieChart>
@@ -157,7 +178,7 @@ export function StatusDonut({
           strokeWidth={2}
         >
           {data.map((d) => (
-            <Cell key={d.key} fill={statusColors[d.key]} />
+            <Cell key={d.key} fill={colors[d.key]} />
           ))}
         </Pie>
       </PieChart>
@@ -166,6 +187,8 @@ export function StatusDonut({
 }
 
 export function ServiceBars({ data }: { data: { name: string; value: number }[] }) {
+  const chart = useChartTheme();
+  const axis = axisCommon(chart);
   return (
     <ResponsiveContainer width="100%" height={300}>
       <BarChart
@@ -175,7 +198,7 @@ export function ServiceBars({ data }: { data: { name: string; value: number }[] 
         barSize={16}
       >
         <CartesianGrid stroke={chart.grid} horizontal={false} />
-        <XAxis type="number" {...axisCommon} />
+        <XAxis type="number" {...axis} />
         <YAxis
           type="category"
           dataKey="name"
@@ -189,6 +212,8 @@ export function ServiceBars({ data }: { data: { name: string; value: number }[] 
           contentStyle={{
             borderRadius: 10,
             border: "1px solid " + chart.border,
+            background: chart.surface,
+            color: chart.foreground,
             fontSize: 12,
             boxShadow: "0 8px 24px rgba(16,24,40,0.1)",
           }}

@@ -50,6 +50,33 @@ export const mechanicsRepository = {
       _count: { _all: true },
     });
   },
+
+  create(data: {
+    name: string;
+    phone: string;
+    zone: string;
+    specialties?: string[];
+    status?: MechanicStatus;
+    since?: number;
+  }) {
+    return prisma.mechanic.create({
+      data: {
+        name: data.name,
+        phone: data.phone,
+        zone: data.zone,
+        specialties: data.specialties ?? [],
+        status: data.status ?? MechanicStatus.available,
+        since: data.since ?? new Date().getFullYear(),
+      },
+      include: {
+        bookings: {
+          orderBy: { scheduledAt: "desc" },
+          take: 8,
+          select: bookingSelect,
+        },
+      },
+    });
+  },
 };
 
 export function buildMechanicWhere(query: MechanicQuery): Prisma.MechanicWhereInput {

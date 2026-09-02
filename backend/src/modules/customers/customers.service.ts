@@ -1,5 +1,12 @@
 import { ApiError } from "../../middleware/error-handler.js";
-import { formatMoney, formatScheduledDate } from "../../lib/formatters.js";
+import {
+  daysAgoStart,
+  endOfDay,
+  formatMoney,
+  formatScheduledDate,
+  pctChange,
+  startOfDay,
+} from "../../lib/formatters.js";
 import {
   buildCustomerWhere,
   customersRepository,
@@ -44,7 +51,30 @@ export const customersService = {
     const where = buildCustomerWhere(query);
     const direction = query.dir === "asc" ? "asc" : "desc";
 
-    const customers = await customersRepository.findMany(where, direction);
+    const today = startOfDay(new Date());
+    const last30Start = daysAgoStart(29);
+    const prev30Start = daysAgoStart(59);
+    const prev30End = endOfDay(daysAgoStart(30));
+    const last30End = endOfDay(today);
+
+    const [
+      customers,
+      customersLast30,
+      customersPrev30,
+      bookingsLast30,
+      bookingsPrev30,
+      revLast,
+      revPrev,
+    ] = await Promise.all([
+      customersRepository.findMany(where, direction),
+      customersRepository.countCreatedInRange(last30Start, last30End),
+      customersRepository.countCreatedInRange(prev30Start, prev30End),
+      customersRepository.countBookingsInRange(last30Start, last30End),
+      customersRepository.countBookingsInRange(prev30Start, prev30End),
+      customersRepository.aggregateCompletedRevenueInRange(last30Start, last30End),
+      customersRepository.aggregateCompletedRevenueInRange(prev30Start, prev30End),
+    ]);
+
     let mapped = await Promise.all(customers.map(mapCustomer));
 
     const sortKey = query.sort;
@@ -80,6 +110,16 @@ export const customersService = {
       { totalBookings: 0, totalSpent: 0 },
     );
 
+    const avgLtv = total ? Math.round(summary.totalSpent / total) : 0;
+    const completedLast = revLast._count._all;
+    const completedPrev = revPrev._count._all;
+    const avgTicketLast = completedLast
+      ? Math.round((revLast._sum.amount?.toNumber() ?? 0) / completedLast)
+      : 0;
+    const avgTicketPrev = completedPrev
+      ? Math.round((revPrev._sum.amount?.toNumber() ?? 0) / completedPrev)
+      : 0;
+
     return {
       data,
       meta: {
@@ -91,7 +131,12 @@ export const customersService = {
       summary: {
         totalCustomers: total,
         totalBookings: summary.totalBookings,
-        avgLifetimeValue: total ? Math.round(summary.totalSpent / total) : 0,
+        avgLifetimeValue: avgLtv,
+        deltas: {
+          totalCustomers: pctChange(customersLast30, customersPrev30),
+          totalBookings: pctChange(bookingsLast30, bookingsPrev30),
+          avgLifetimeValue: pctChange(avgTicketLast, avgTicketPrev),
+        },
       },
     };
   },
@@ -102,6 +147,28 @@ export const customersService = {
     if (!customer) {
       throw new ApiError(404, "Customer not found");
     }
+
+    return mapCustomer(customer);
+  },
+
+  async create(input: {
+    name?: string;
+    phone?: string;
+    email?: string;
+    zone?: string;
+  }) {
+    const name = input.name?.trim();
+    const phone = input.phone?.trim();
+    if (!name || !phone) {
+      throw new ApiError(400, "Name and phone are required");
+    }
+
+    const customer = await customersRepository.create({
+      name,
+      phone,
+      email: input.email?.trim() || null,
+      zone: input.zone?.trim() || null,
+    });
 
     return mapCustomer(customer);
   },

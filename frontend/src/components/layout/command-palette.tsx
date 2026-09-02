@@ -27,7 +27,7 @@ const PAGES: Item[] = [
   {
     id: "p-overview",
     label: "Overview",
-    hint: "Live ops",
+    hint: "Overview",
     group: "Go to",
     icon: CircleGauge,
     href: "/dashboard",

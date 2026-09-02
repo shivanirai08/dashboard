@@ -49,6 +49,14 @@ export const analyticsRepository = {
     start.setHours(0, 0, 0, 0);
     return { start, end };
   },
+
+  /** Equal-length window immediately before `currentStart`. */
+  previousRange(currentStart: Date, days: number) {
+    const end = endOfDay(new Date(currentStart.getTime() - 1));
+    const start = startOfDay(end);
+    start.setDate(end.getDate() - (days - 1));
+    return { start, end };
+  },
 };
 
 export function parseAnalyticsRange(value: string | undefined): number {

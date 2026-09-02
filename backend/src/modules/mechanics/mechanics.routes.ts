@@ -5,5 +5,6 @@ import { mechanicsController } from "./mechanics.controller.js";
 export const mechanicsRouter = Router();
 
 mechanicsRouter.get("/", asyncHandler(mechanicsController.list));
+mechanicsRouter.post("/", asyncHandler(mechanicsController.create));
 mechanicsRouter.get("/meta/counts", asyncHandler(mechanicsController.getStatusCounts));
 mechanicsRouter.get("/:id", asyncHandler(mechanicsController.getById));
