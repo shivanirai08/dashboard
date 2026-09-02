@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import {
   ArrowDown,
@@ -28,9 +28,10 @@ import {
   PrimaryButton,
   Skeleton,
   Trend,
-  useDataMode,
 } from "@/components/ui";
-import { customers as ALL, money } from "@/lib/mock-data";
+import { api } from "@/lib/api";
+import { money } from "@/lib/format";
+import { useDebounce } from "@/hooks/use-debounce";
 import type { Customer } from "@/types";
 
 type SortKey = "name" | "bookingsCount" | "totalSpent" | "joinedAt";
@@ -184,8 +185,8 @@ function CustomerDrawer({ customer, onClose }: { customer: Customer; onClose: ()
 }
 
 export default function CustomersContent() {
-  const [mode, setMode] = useDataMode();
   const [query, setQuery] = useState("");
+  const debouncedQuery = useDebounce(query);
   const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({
     key: "totalSpent",
     dir: "desc",
@@ -193,36 +194,44 @@ export default function CustomersContent() {
   const [page, setPage] = useState(0);
   const [selected, setSelected] = useState<Customer | null>(null);
 
-  const summary = useMemo(() => {
-    const totalSpent = ALL.reduce((s, c) => s + c.totalSpent, 0);
-    const totalBookings = ALL.reduce((s, c) => s + c.bookingsCount, 0);
-    const avgLifetime = ALL.length ? Math.round(totalSpent / ALL.length) : 0;
-    return { totalSpent, totalBookings, avgLifetime };
-  }, []);
+  const [rows, setRows] = useState<Customer[]>([]);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [summary, setSummary] = useState({
+    totalCustomers: 0,
+    totalBookings: 0,
+    avgLifetimeValue: 0,
+  });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
-  const rows = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const filtered = ALL.filter((c) => {
-      if (!q) return true;
-      return (
-        c.name.toLowerCase().includes(q) ||
-        c.phone.includes(q) ||
-        c.email.toLowerCase().includes(q) ||
-        c.zone.toLowerCase().includes(q) ||
-        c.id.toLowerCase().includes(q)
-      );
-    });
-    const dir = sort.dir === "asc" ? 1 : -1;
-    return [...filtered].sort((a, b) => {
-      if (sort.key === "bookingsCount" || sort.key === "totalSpent") {
-        return (a[sort.key] - b[sort.key]) * dir;
-      }
-      return String(a[sort.key]).localeCompare(String(b[sort.key])) * dir;
-    });
-  }, [query, sort]);
+  const load = useCallback(() => {
+    setLoading(true);
+    setError(false);
+    api
+      .getCustomers({
+        q: debouncedQuery || undefined,
+        sort: sort.key,
+        dir: sort.dir,
+        page,
+        limit: PAGE_SIZE,
+      })
+      .then((result) => {
+        setRows(result.data);
+        setTotal(result.meta.total);
+        setTotalPages(result.meta.totalPages);
+        setSummary(result.summary);
+      })
+      .catch(() => setError(true))
+      .finally(() => setLoading(false));
+  }, [debouncedQuery, sort, page]);
 
-  const pageRows = rows.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
-  const pages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const pageRows = rows;
+  const pages = totalPages;
 
   function toggleSort(key: SortKey) {
     setPage(0);
@@ -231,14 +240,12 @@ export default function CustomersContent() {
     );
   }
 
-  const loading = mode === "loading";
-  const error = mode === "error";
-  const empty = mode === "empty";
+  const empty = !loading && !error && summary.totalCustomers === 0;
 
   return (
     <AppLayout
       title="Customers"
-      subtitle={`${ALL.length} accounts · vehicles and service history`}
+      subtitle={`${summary.totalCustomers.toLocaleString("en-IN")} accounts · vehicles and service history`}
       actions={
         <>
           <div className="relative">
@@ -287,15 +294,15 @@ export default function CustomersContent() {
       <div className="mx-auto flex max-w-[1320px] flex-col gap-5">
         <div className="grid grid-cols-1 gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-3">
           {[
-            { label: "Total customers", value: ALL.length.toLocaleString("en-US"), delta: 9.6 },
+            { label: "Total customers", value: summary.totalCustomers.toLocaleString("en-IN"), delta: 9.6 },
             {
               label: "Total bookings",
-              value: summary.totalBookings.toLocaleString("en-US"),
+              value: summary.totalBookings.toLocaleString("en-IN"),
               delta: 8.4,
             },
             {
               label: "Avg lifetime value",
-              value: money(summary.avgLifetime),
+              value: money(summary.avgLifetimeValue),
               delta: 5.2,
             },
           ].map((s) => (
@@ -323,7 +330,7 @@ export default function CustomersContent() {
               ))}
             </div>
           ) : error ? (
-            <ErrorState onRetry={() => setMode("ready")} />
+            <ErrorState onRetry={load} />
           ) : empty || rows.length === 0 ? (
             <EmptyState
               icon={
@@ -444,9 +451,9 @@ export default function CustomersContent() {
               <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-surface-2 px-4 py-2.5">
                 <p className="text-xs tabular-nums text-muted">
                   <span className="font-medium text-foreground">
-                    {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, rows.length)}
+                    {total === 0 ? 0 : page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, total)}
                   </span>{" "}
-                  of <span className="font-medium text-foreground">{rows.length}</span>
+                  of <span className="font-medium text-foreground">{total}</span>
                 </p>
                 <div className="flex items-center gap-1">
                   <button

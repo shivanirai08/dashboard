@@ -12,7 +12,7 @@ import {
   Users,
   Wrench,
 } from "lucide-react";
-import { bookings, mechanics } from "@/lib/mock-data";
+import { api } from "@/lib/api";
 
 type Item = {
   id: string;
@@ -74,26 +74,6 @@ const PAGES: Item[] = [
   },
 ];
 
-const BOOKING_ITEMS: Item[] = bookings.slice(0, 30).map((b) => ({
-  id: "b-" + b.id,
-  label: `${b.id} · ${b.customer}`,
-  hint: b.service,
-  group: "Bookings" as const,
-  icon: ClipboardList,
-  href: "/bookings?q=" + encodeURIComponent(b.id),
-}));
-
-const MECHANIC_ITEMS: Item[] = mechanics.map((m) => ({
-  id: "m-" + m.id,
-  label: m.name,
-  hint: m.zone,
-  group: "Mechanics" as const,
-  icon: User,
-  href: "/mechanics?q=" + encodeURIComponent(m.name),
-}));
-
-const ALL_ITEMS = [...PAGES, ...BOOKING_ITEMS, ...MECHANIC_ITEMS];
-
 export function useCommandPalette() {
   const [open, setOpen] = useState(false);
   useEffect(() => {
@@ -120,16 +100,57 @@ export default function CommandPalette({
   const [query, setQuery] = useState("");
   const [cursor, setCursor] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
+  const [bookingItems, setBookingItems] = useState<Item[]>([]);
+  const [mechanicItems, setMechanicItems] = useState<Item[]>([]);
+
+  useEffect(() => {
+    if (!open) return;
+    Promise.all([
+      api.getBookings({ limit: 30, sort: "date", dir: "desc" }),
+      api.getMechanics(),
+    ])
+      .then(([bookingsRes, mechanicsRes]) => {
+        setBookingItems(
+          bookingsRes.data.map((b) => ({
+            id: "b-" + b.id,
+            label: `${b.id} · ${b.customer}`,
+            hint: b.service,
+            group: "Bookings" as const,
+            icon: ClipboardList,
+            href: "/bookings?q=" + encodeURIComponent(b.id),
+          })),
+        );
+        setMechanicItems(
+          mechanicsRes.data.map((m) => ({
+            id: "m-" + m.id,
+            label: m.name,
+            hint: m.zone,
+            group: "Mechanics" as const,
+            icon: User,
+            href: "/mechanics?q=" + encodeURIComponent(m.name),
+          })),
+        );
+      })
+      .catch(() => {
+        setBookingItems([]);
+        setMechanicItems([]);
+      });
+  }, [open]);
+
+  const allItems = useMemo(
+    () => [...PAGES, ...bookingItems, ...mechanicItems],
+    [bookingItems, mechanicItems],
+  );
 
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
     const pool = q
-      ? ALL_ITEMS.filter(
+      ? allItems.filter(
           (i) => i.label.toLowerCase().includes(q) || i.hint.toLowerCase().includes(q),
         )
       : PAGES;
     return pool.slice(0, 12);
-  }, [query]);
+  }, [query, allItems]);
 
   useEffect(() => {
     if (open) {

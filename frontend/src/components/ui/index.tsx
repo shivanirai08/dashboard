@@ -3,7 +3,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { ArrowDownRight, ArrowUpRight, RotateCw, TriangleAlert } from "lucide-react";
 import type { BookingStatus, DataMode, MechanicStatus } from "@/types";
-import { mechanicStatusLabel, statusLabel } from "@/lib/mock-data";
+import { mechanicStatusLabel, statusLabel } from "@/lib/format";
 
 export function useDataMode(delay = 750): [DataMode, (m: DataMode) => void] {
   const [mode, setMode] = useState<DataMode>("loading");

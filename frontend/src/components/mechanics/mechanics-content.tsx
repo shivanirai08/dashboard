@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   LayoutGrid,
@@ -23,9 +23,10 @@ import {
   Panel,
   PrimaryButton,
   Skeleton,
-  useDataMode,
 } from "@/components/ui";
-import { mechanics as ALL, mechanicStatusLabel } from "@/lib/mock-data";
+import { api, type MechanicStatusCounts } from "@/lib/api";
+import { mechanicStatusLabel } from "@/lib/format";
+import { useDebounce } from "@/hooks/use-debounce";
 import type { Mechanic, MechanicStatus } from "@/types";
 
 const FILTERS: { key: MechanicStatus | "all"; label: string }[] = [
@@ -196,39 +197,48 @@ function DetailPanel({ m, onClose }: { m: Mechanic; onClose: () => void }) {
 }
 
 function MechanicsContentInner() {
-  const [mode, setMode] = useDataMode();
   const searchParams = useSearchParams();
   const [filter, setFilter] = useState<MechanicStatus | "all">("all");
   const [query, setQuery] = useState(searchParams.get("q") ?? "");
+  const debouncedQuery = useDebounce(query);
   const [view, setView] = useState<"grid" | "list">("grid");
   const [selected, setSelected] = useState<Mechanic | null>(null);
+
+  const [rows, setRows] = useState<Mechanic[]>([]);
+  const [counts, setCounts] = useState<MechanicStatusCounts>({
+    all: 0,
+    available: 0,
+    on_job: 0,
+    offline: 0,
+  });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
     const q = searchParams.get("q");
     if (q !== null) setQuery(q);
   }, [searchParams]);
 
-  const rows = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return ALL.filter((m) => {
-      if (filter !== "all" && m.status !== filter) return false;
-      if (!q) return true;
-      return m.name.toLowerCase().includes(q) || m.zone.toLowerCase().includes(q);
-    });
-  }, [filter, query]);
+  const load = useCallback(() => {
+    setLoading(true);
+    setError(false);
+    Promise.all([
+      api.getMechanics({ q: debouncedQuery || undefined, status: filter }),
+      api.getMechanicStatusCounts(),
+    ])
+      .then(([list, statusCounts]) => {
+        setRows(list.data);
+        setCounts(statusCounts);
+      })
+      .catch(() => setError(true))
+      .finally(() => setLoading(false));
+  }, [debouncedQuery, filter]);
 
-  const counts = useMemo(
-    () => ({
-      available: ALL.filter((m) => m.status === "available").length,
-      on_job: ALL.filter((m) => m.status === "on_job").length,
-      offline: ALL.filter((m) => m.status === "offline").length,
-    }),
-    [],
-  );
+  useEffect(() => {
+    load();
+  }, [load]);
 
-  const loading = mode === "loading";
-  const error = mode === "error";
-  const empty = mode === "empty";
+  const empty = !loading && !error && counts.all === 0;
 
   return (
     <AppLayout
@@ -252,7 +262,7 @@ function MechanicsContentInner() {
                 <span
                   className={"tabular-nums " + (filter === f.key ? "text-accent" : "text-subtle")}
                 >
-                  {f.key === "all" ? ALL.length : ALL.filter((m) => m.status === f.key).length}
+                  {f.key === "all" ? counts.all : counts[f.key]}
                 </span>
               </button>
             ))}
@@ -320,7 +330,7 @@ function MechanicsContentInner() {
           </div>
         ) : error ? (
           <Panel>
-            <ErrorState onRetry={() => setMode("ready")} />
+            <ErrorState onRetry={load} />
           </Panel>
         ) : empty || rows.length === 0 ? (
           <Panel>

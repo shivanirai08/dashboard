@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowDown,
@@ -30,13 +30,10 @@ import {
   PrimaryButton,
   Skeleton,
   StatusPill,
-  useDataMode,
 } from "@/components/ui";
-import {
-  bookings as ALL,
-  money,
-  statusLabel,
-} from "@/lib/mock-data";
+import { api, type StatusCounts } from "@/lib/api";
+import { money, statusLabel } from "@/lib/format";
+import { useDebounce } from "@/hooks/use-debounce";
 import type { Booking, BookingStatus } from "@/types";
 
 type SortKey = "id" | "customer" | "service" | "mechanic" | "amount" | "date";
@@ -238,12 +235,12 @@ function BookingDrawer({
 }
 
 function BookingsContentInner() {
-  const [mode, setMode] = useDataMode();
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
 
   const [query, setQuery] = useState(searchParams.get("q") ?? "");
+  const debouncedQuery = useDebounce(query);
   const [status, setStatus] = useState<string>(searchParams.get("status") ?? "all");
   const [service, setService] = useState<string>("all");
   const [mechanic, setMechanic] = useState<string>("all");
@@ -256,6 +253,15 @@ function BookingsContentInner() {
   const [page, setPage] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
+  const [rows, setRows] = useState<Booking[]>([]);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [counts, setCounts] = useState<StatusCounts>({ all: 0 });
+  const [services, setServices] = useState<string[]>([]);
+  const [mechanicNames, setMechanicNames] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+
   useEffect(() => {
     const q = searchParams.get("q");
     const st = searchParams.get("status");
@@ -264,43 +270,65 @@ function BookingsContentInner() {
     else setStatus("all");
   }, [searchParams]);
 
-  const services = useMemo(() => Array.from(new Set(ALL.map((b) => b.service))).sort(), []);
-  const mechanicNames = useMemo(
-    () => Array.from(new Set(ALL.map((b) => b.mechanic).filter(Boolean) as string[])).sort(),
-    [],
-  );
-
-  const counts = useMemo(() => {
-    const c: Record<string, number> = { all: ALL.length };
-    for (const b of ALL) c[b.status] = (c[b.status] ?? 0) + 1;
-    return c;
+  useEffect(() => {
+    api.getBookingStatusCounts().then(setCounts).catch(() => {});
+    api
+      .getBookingFilters()
+      .then((filters) => {
+        setServices(filters.services);
+        setMechanicNames(filters.mechanics);
+      })
+      .catch(() => {});
   }, []);
 
-  const rows = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const filtered = ALL.filter((b) => {
-      if (status !== "all" && b.status !== status) return false;
-      if (service !== "all" && b.service !== service) return false;
-      if (mechanic !== "all" && b.mechanic !== mechanic) return false;
-      if (!q) return true;
-      return (
-        b.id.toLowerCase().includes(q) ||
-        b.customer.toLowerCase().includes(q) ||
-        b.vehicle.toLowerCase().includes(q) ||
-        b.plate.toLowerCase().includes(q) ||
-        b.service.toLowerCase().includes(q) ||
-        (b.mechanic ?? "").toLowerCase().includes(q)
-      );
-    });
-    const dir = sort.dir === "asc" ? 1 : -1;
-    return [...filtered].sort((a, b) => {
-      if (sort.key === "amount") return (a.amount - b.amount) * dir;
-      return String(a[sort.key] ?? "").localeCompare(String(b[sort.key] ?? "")) * dir;
-    });
-  }, [query, status, service, mechanic, sort]);
+  useEffect(() => {
+    setLoading(true);
+    setError(false);
+    api
+      .getBookings({
+        q: debouncedQuery || undefined,
+        status,
+        service,
+        mechanic,
+        sort: sort.key,
+        dir: sort.dir,
+        page,
+        limit: PAGE_SIZE,
+      })
+      .then((result) => {
+        setRows(result.data);
+        setTotal(result.meta.total);
+        setTotalPages(result.meta.totalPages);
+      })
+      .catch(() => setError(true))
+      .finally(() => setLoading(false));
+  }, [debouncedQuery, status, service, mechanic, sort, page]);
 
-  const pageRows = rows.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
-  const pages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  const reload = () => {
+    setError(false);
+    setLoading(true);
+    api
+      .getBookings({
+        q: debouncedQuery || undefined,
+        status,
+        service,
+        mechanic,
+        sort: sort.key,
+        dir: sort.dir,
+        page,
+        limit: PAGE_SIZE,
+      })
+      .then((result) => {
+        setRows(result.data);
+        setTotal(result.meta.total);
+        setTotalPages(result.meta.totalPages);
+      })
+      .catch(() => setError(true))
+      .finally(() => setLoading(false));
+  };
+
+  const pageRows = rows;
+  const pages = totalPages;
   const extraFilters = (service !== "all" ? 1 : 0) + (mechanic !== "all" ? 1 : 0);
 
   const selectedIndex = rows.findIndex((b) => b.id === selectedId);
@@ -345,14 +373,12 @@ function BookingsContentInner() {
     router.replace(pathname);
   }
 
-  const loading = mode === "loading";
-  const error = mode === "error";
-  const empty = mode === "empty";
+  const empty = !loading && !error && total === 0 && !debouncedQuery && status === "all";
 
   return (
     <AppLayout
       title="Bookings"
-      subtitle={`${ALL.length} jobs · last 30 days`}
+      subtitle={`${total.toLocaleString("en-IN")} jobs · all zones`}
       actions={
         <>
           <div className="flex items-center gap-0.5 overflow-x-auto rounded-lg bg-surface-3 p-0.5">
@@ -532,7 +558,7 @@ function BookingsContentInner() {
               ))}
             </div>
           ) : error ? (
-            <ErrorState onRetry={() => setMode("ready")} />
+            <ErrorState onRetry={reload} />
           ) : empty || rows.length === 0 ? (
             <EmptyState
               icon={<Inbox size={18} strokeWidth={1.5} />}
@@ -662,9 +688,9 @@ function BookingsContentInner() {
               <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-surface-2 px-4 py-2.5">
                 <p className="text-xs tabular-nums text-muted">
                   <span className="font-medium text-foreground">
-                    {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, rows.length)}
+                    {total === 0 ? 0 : page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, total)}
                   </span>{" "}
-                  of <span className="font-medium text-foreground">{rows.length}</span>
+                  of <span className="font-medium text-foreground">{total}</span>
                 </p>
                 <div className="flex items-center gap-1">
                   <button
@@ -711,7 +737,7 @@ function BookingsContentInner() {
           onClose={() => setSelectedId(null)}
           onPrev={() => step(-1)}
           onNext={() => step(1)}
-          position={`${selectedIndex + 1} of ${rows.length}`}
+          position={`${selectedIndex + 1} of ${total}`}
         />
       ) : null}
     </AppLayout>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Download, TrendingUp } from "lucide-react";
 import {
   BookingsLine,
@@ -18,14 +18,9 @@ import {
   PanelHead,
   Skeleton,
   Trend,
-  useDataMode,
 } from "@/components/ui";
-import {
-  compactMoney,
-  seriesFor,
-  serviceBreakdown,
-  statusBreakdown,
-} from "@/lib/mock-data";
+import { api, type AnalyticsData } from "@/lib/api";
+import { compactMoney } from "@/lib/format";
 
 type Range = "7d" | "30d" | "90d";
 
@@ -57,20 +52,39 @@ function RangeToggle({ value, onChange }: { value: Range; onChange: (r: Range) =
 }
 
 export default function AnalyticsContent() {
-  const [mode, setMode] = useDataMode();
   const [range, setRange] = useState<Range>("30d");
-  const data = useMemo(() => seriesFor(range), [range]);
+  const [data, setData] = useState<AnalyticsData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
-  const totals = useMemo(() => {
-    const bookings = data.reduce((s, d) => s + d.bookings, 0);
-    const revenue = data.reduce((s, d) => s + d.revenue, 0);
-    const completed = data.reduce((s, d) => s + d.completed, 0);
-    return { bookings, revenue, completed };
-  }, [data]);
+  const load = useCallback(() => {
+    setLoading(true);
+    setError(false);
+    api
+      .getAnalytics(range)
+      .then(setData)
+      .catch(() => setError(true))
+      .finally(() => setLoading(false));
+  }, [range]);
 
-  const loading = mode === "loading";
-  const error = mode === "error";
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const totals = data?.totals ?? { bookings: 0, revenue: 0, completionRate: 0 };
+  const series = data?.series ?? [];
+  const statusBreakdown = data?.statusBreakdown ?? [];
+  const serviceBreakdown = data?.serviceBreakdown ?? [];
   const statusTotal = statusBreakdown.reduce((s, d) => s + d.value, 0);
+
+  const statCards = useMemo(
+    () => [
+      { label: "Bookings", value: totals.bookings.toLocaleString("en-IN"), delta: 8.4 },
+      { label: "Revenue", value: data?.revenueFormatted ?? compactMoney(totals.revenue), delta: 11.7 },
+      { label: "Completion rate", value: `${totals.completionRate}%`, delta: 1.9 },
+    ],
+    [totals, data?.revenueFormatted],
+  );
 
   return (
     <AppLayout
@@ -90,15 +104,7 @@ export default function AnalyticsContent() {
     >
       <div className="mx-auto flex max-w-[1320px] flex-col gap-5">
         <div className="grid grid-cols-1 gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-3">
-          {[
-            { label: "Bookings", value: totals.bookings.toLocaleString("en-US"), delta: 8.4 },
-            { label: "Revenue", value: compactMoney(totals.revenue), delta: 11.7 },
-            {
-              label: "Completion rate",
-              value: `${Math.round((totals.completed / totals.bookings) * 100)}%`,
-              delta: 1.9,
-            },
-          ].map((s) => (
+          {statCards.map((s) => (
             <div key={s.label} className="bg-surface px-5 py-4">
               <p className="text-[11px] font-medium text-muted">{s.label}</p>
               {loading ? (
@@ -136,10 +142,10 @@ export default function AnalyticsContent() {
             {loading ? (
               <ChartSkeleton />
             ) : error ? (
-              <ErrorState compact onRetry={() => setMode("ready")} />
+              <ErrorState compact onRetry={load} />
             ) : (
               <div className="px-3 py-4">
-                <BookingsLine data={data} />
+                <BookingsLine data={series} />
               </div>
             )}
           </Panel>
@@ -158,10 +164,10 @@ export default function AnalyticsContent() {
             {loading ? (
               <ChartSkeleton />
             ) : error ? (
-              <ErrorState compact onRetry={() => setMode("ready")} />
+              <ErrorState compact onRetry={load} />
             ) : (
               <div className="px-3 py-4">
-                <RevenueArea data={data} />
+                <RevenueArea data={series} />
               </div>
             )}
           </Panel>
@@ -171,14 +177,14 @@ export default function AnalyticsContent() {
             {loading ? (
               <ChartSkeleton />
             ) : error ? (
-              <ErrorState compact onRetry={() => setMode("ready")} />
+              <ErrorState compact onRetry={load} />
             ) : (
               <div className="grid grid-cols-1 items-center gap-2 px-5 py-5 sm:grid-cols-[220px_1fr]">
                 <div className="relative">
                   <StatusDonut data={statusBreakdown} />
                   <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
                     <p className="text-xl font-semibold tracking-tight tabular-nums text-foreground">
-                      {statusTotal.toLocaleString("en-US")}
+                      {statusTotal.toLocaleString("en-IN")}
                     </p>
                     <p className="text-[11px] text-subtle">total jobs</p>
                   </div>
@@ -192,10 +198,10 @@ export default function AnalyticsContent() {
                       />
                       <span className="flex-1 text-[13px] text-muted">{s.name}</span>
                       <span className="text-[13px] font-medium tabular-nums text-foreground">
-                        {s.value.toLocaleString("en-US")}
+                        {s.value.toLocaleString("en-IN")}
                       </span>
                       <span className="w-11 text-right text-[11px] tabular-nums text-subtle">
-                        {((s.value / statusTotal) * 100).toFixed(1)}%
+                        {statusTotal ? ((s.value / statusTotal) * 100).toFixed(1) : "0.0"}%
                       </span>
                     </li>
                   ))}
@@ -208,12 +214,12 @@ export default function AnalyticsContent() {
             <PanelHead
               title="Service breakdown"
               subtitle="Jobs by category"
-              right={<span className="text-[11px] text-subtle">Top 8 of 14 services</span>}
+              right={<span className="text-[11px] text-subtle">Top 8 services</span>}
             />
             {loading ? (
               <ChartSkeleton />
             ) : error ? (
-              <ErrorState compact onRetry={() => setMode("ready")} />
+              <ErrorState compact onRetry={load} />
             ) : (
               <div className="px-3 py-5">
                 <ServiceBars data={serviceBreakdown} />

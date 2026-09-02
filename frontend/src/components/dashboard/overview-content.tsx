@@ -1,5 +1,6 @@
 "use client";
 
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -29,9 +30,10 @@ import {
   StatusDot,
   StatusPill,
   Trend,
-  useDataMode,
 } from "@/components/ui";
-import { activity, kpis, money, recentBookings, series30 } from "@/lib/mock-data";
+import { api, type DashboardOverview } from "@/lib/api";
+import { compactMoney, formatTodaySubtitle, money } from "@/lib/format";
+import type { Activity, Booking, Kpi, SeriesPoint } from "@/types";
 
 const ICONS = {
   calendar: CalendarDays,
@@ -55,10 +57,21 @@ const DRILL: Record<string, string> = {
   customers: "/customers",
 };
 
+const EMPTY_KPIS: Kpi[] = [
+  { key: "total", label: "Total bookings", value: "—", delta: 0, icon: "calendar" },
+  { key: "today", label: "Today", value: "—", delta: 0, icon: "clock", tone: "accent" },
+  { key: "completed", label: "Completed", value: "—", delta: 0, icon: "check" },
+  { key: "pending", label: "Pending", value: "—", delta: 0, icon: "hourglass", tone: "accent" },
+  { key: "cancelled", label: "Cancelled", value: "—", delta: 0, icon: "x" },
+  { key: "revenue", label: "Total revenue", value: "—", delta: 0, icon: "revenue" },
+  { key: "mechanics", label: "Active mechanics", value: "—", delta: 0, icon: "wrench" },
+  { key: "customers", label: "New customers", value: "—", delta: 0, icon: "users" },
+];
+
 const RAIL =
   "grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-4 xl:grid-cols-8";
 
-function KpiRail() {
+function KpiRail({ kpis }: { kpis: Kpi[] }) {
   return (
     <div className={RAIL}>
       {kpis.map((k) => {
@@ -112,7 +125,7 @@ function KpiRailSkeleton() {
 function KpiRailEmpty() {
   return (
     <div className={RAIL}>
-      {kpis.map((k) => (
+      {EMPTY_KPIS.map((k) => (
         <div key={k.key} className="bg-surface px-4 py-4">
           <p className="truncate text-[11px] font-medium text-muted">{k.label}</p>
           <p className="mt-2 text-2xl font-semibold tracking-tight tabular-nums text-border-strong">
@@ -139,15 +152,49 @@ function Legend({ items }: { items: { label: string; className: string }[] }) {
 }
 
 export default function OverviewContent() {
-  const [mode, setMode] = useDataMode();
-  const loading = mode === "loading";
-  const empty = mode === "empty";
-  const error = mode === "error";
+  const [data, setData] = useState<DashboardOverview | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [syncedAt, setSyncedAt] = useState<Date | null>(null);
+
+  const load = useCallback(() => {
+    setLoading(true);
+    setError(false);
+    api
+      .getDashboard()
+      .then((result) => {
+        setData(result);
+        setSyncedAt(new Date());
+      })
+      .catch(() => setError(true))
+      .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const kpis = data?.kpis ?? [];
+  const series30: SeriesPoint[] = data?.series30 ?? [];
+  const recentBookings: Booking[] = data?.recentBookings ?? [];
+  const activity: Activity[] = data?.activity ?? [];
+
+  const revenueTotal = useMemo(
+    () => series30.reduce((sum, point) => sum + point.revenue, 0),
+    [series30],
+  );
+
+  const pendingCount = useMemo(() => {
+    const pending = kpis.find((k) => k.key === "pending");
+    return pending?.value ?? "0";
+  }, [kpis]);
+
+  const empty = !loading && !error && kpis.length === 0;
 
   return (
     <AppLayout
       title="Live Ops"
-      subtitle="Sat 14 Feb 2026 · SF Bay region"
+      subtitle={formatTodaySubtitle()}
       actions={
         <>
           <PrimaryButton>
@@ -158,15 +205,23 @@ export default function OverviewContent() {
             href="/bookings?status=pending"
             className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-pending-soft px-3 text-xs font-medium text-pending hover:bg-pending-soft/70"
           >
-            37 jobs awaiting dispatch
+            {pendingCount} jobs awaiting dispatch
             <ArrowRight size={13} strokeWidth={2} />
           </Link>
-          <span className="ml-auto text-xs text-subtle">Synced 12s ago</span>
+          <span className="ml-auto text-xs text-subtle">
+            {syncedAt ? `Synced ${syncedAt.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}` : "Syncing…"}
+          </span>
         </>
       }
     >
       <div className="mx-auto flex max-w-[1320px] flex-col gap-5">
-        {loading ? <KpiRailSkeleton /> : empty ? <KpiRailEmpty /> : <KpiRail />}
+        {loading ? (
+          <KpiRailSkeleton />
+        ) : empty ? (
+          <KpiRailEmpty />
+        ) : (
+          <KpiRail kpis={kpis} />
+        )}
 
         <section className="grid grid-cols-1 gap-5 xl:grid-cols-2">
           <Panel>
@@ -185,7 +240,7 @@ export default function OverviewContent() {
             {loading ? (
               <ChartSkeleton />
             ) : error ? (
-              <ErrorState compact onRetry={() => setMode("ready")} />
+              <ErrorState compact onRetry={load} />
             ) : empty ? (
               <EmptyState
                 compact
@@ -207,7 +262,7 @@ export default function OverviewContent() {
               right={
                 <div className="flex items-baseline gap-2">
                   <p className="text-[13px] font-semibold tabular-nums tracking-tight text-foreground">
-                    $284,140
+                    {compactMoney(revenueTotal)}
                   </p>
                   <Trend delta={11.7} />
                 </div>
@@ -216,7 +271,7 @@ export default function OverviewContent() {
             {loading ? (
               <ChartSkeleton />
             ) : error ? (
-              <ErrorState compact onRetry={() => setMode("ready")} />
+              <ErrorState compact onRetry={load} />
             ) : empty ? (
               <EmptyState
                 compact
@@ -250,8 +305,8 @@ export default function OverviewContent() {
             {loading ? (
               <SkeletonLines rows={5} />
             ) : error ? (
-              <ErrorState compact onRetry={() => setMode("ready")} />
-            ) : empty ? (
+              <ErrorState compact onRetry={load} />
+            ) : empty || recentBookings.length === 0 ? (
               <EmptyState
                 compact
                 icon={<Inbox size={18} strokeWidth={1.5} />}
@@ -313,8 +368,8 @@ export default function OverviewContent() {
             {loading ? (
               <SkeletonLines rows={5} />
             ) : error ? (
-              <ErrorState compact onRetry={() => setMode("ready")} />
-            ) : empty ? (
+              <ErrorState compact onRetry={load} />
+            ) : empty || activity.length === 0 ? (
               <EmptyState
                 compact
                 icon={<Zap size={18} strokeWidth={1.5} />}
