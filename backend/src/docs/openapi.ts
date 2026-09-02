@@ -6,25 +6,82 @@ export const openApiSpec = {
   info: {
     title: "Instant Mechanic Live Ops API",
     version: "1.0.0",
-    description:
-      "REST API for the Instant Mechanic Live Vehicle Service Operations Dashboard. " +
-      "Powers overview KPIs, analytics, bookings, mechanics, and customers pages.",
+    description: [
+      "REST API for the Instant Mechanic Live Vehicle Service Operations Dashboard.",
+      "Powers overview KPIs, analytics, bookings, mechanics, and customers.",
+      "",
+      "## Realtime (WebSockets)",
+      "",
+      "Clients also connect to a **WebSocket** at `/ws` on the same host (e.g. `ws://localhost:4000/ws` or `wss://api.shivanirai08.me/ws`).",
+      "After mutating bookings / customers / mechanics, the API broadcasts a JSON event to every connected client so the dashboard can update without a full page reload.",
+      "",
+      "| REST action | Event `type` |",
+      "|-------------|--------------|",
+      "| `POST /api/bookings` | `booking.created` |",
+      "| `PATCH /api/bookings/{id}/reassign` | `booking.updated` |",
+      "| `PATCH /api/bookings/{id}/status` | `booking.updated` |",
+      "| `POST /api/customers` | `customer.created` |",
+      "| `POST /api/mechanics` | `mechanic.created` |",
+      "",
+      "Event payload shape: `RealtimeEvent` (see Schemas). On connect the server may send `{ type: \"ping\" }`.",
+      "Swagger UI cannot open a WebSocket “Try it out” session — use the browser dashboard or a WS client to verify.",
+    ].join("\n"),
     contact: {
       name: "Instant Mechanic",
     },
   },
   servers: [
+    { url: "https://api.shivanirai08.me", description: "Production" },
     { url: "http://localhost:4000", description: "Local development" },
   ],
   tags: [
     { name: "Health", description: "Service health check" },
+    {
+      name: "Realtime",
+      description:
+        "WebSocket live channel at `/ws`. Not HTTP — see API description and the `/ws` path docs.",
+    },
     { name: "Dashboard", description: "Overview page — KPIs, charts, recent activity" },
     { name: "Analytics", description: "Analytics page — trends and breakdowns" },
-    { name: "Bookings", description: "Bookings list, filters, and detail" },
+    { name: "Bookings", description: "Bookings list, filters, create, assign, status updates" },
     { name: "Mechanics", description: "Mechanics roster and status" },
     { name: "Customers", description: "Customer directory and profiles" },
   ],
   paths: {
+    "/ws": {
+      get: {
+        tags: ["Realtime"],
+        summary: "WebSocket realtime channel",
+        description: [
+          "**Protocol: WebSocket** (not a normal HTTP GET).",
+          "",
+          "Connect to `ws://<host>/ws` (or `wss://` behind TLS). The HTTP server upgrades the connection.",
+          "",
+          "### Server → client messages",
+          "JSON objects matching `RealtimeEvent`. Example:",
+          "```json",
+          "{",
+          '  \"type\": \"booking.created\",',
+          '  \"at\": \"2026-09-03T01:00:00.000Z\",',
+          '  \"message\": \"Yash Sharma booked Flat tyre change · IM-48299\",',
+          '  \"data\": { \"id\": \"IM-48299\", \"status\": \"pending\" }',
+          "}",
+          "```",
+          "",
+          "### Client → server",
+          "Optional: send `{ \"type\": \"ping\" }` — server replies with `{ \"type\": \"ping\", \"message\": \"pong\" }`.",
+          "",
+          "### Event types",
+          "`booking.created` · `booking.updated` · `customer.created` · `mechanic.created` · `ping`",
+        ].join("\n"),
+        responses: {
+          "101": {
+            description:
+              "Switching Protocols — WebSocket connection established. Further frames are JSON RealtimeEvent messages.",
+          },
+        },
+      },
+    },
     "/api/health": {
       get: {
         tags: ["Health"],
@@ -40,6 +97,11 @@ export const openApiSpec = {
                   properties: {
                     ok: { type: "boolean", example: true },
                     service: { type: "string", example: "instant-mechanic-api" },
+                    realtime: {
+                      type: "string",
+                      example: "ws /ws",
+                      description: "Hint that live updates are available on the WebSocket path",
+                    },
                   },
                 },
               },
@@ -119,6 +181,32 @@ export const openApiSpec = {
           "500": { $ref: "#/components/responses/InternalError" },
         },
       },
+      post: {
+        tags: ["Bookings"],
+        summary: "Create booking",
+        description:
+          "Creates a booking (and customer if phone is new). Emits WebSocket `booking.created`.",
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/CreateBookingRequest" },
+            },
+          },
+        },
+        responses: {
+          "201": {
+            description: "Created booking",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/Booking" },
+              },
+            },
+          },
+          "400": { $ref: "#/components/responses/BadRequest" },
+          "500": { $ref: "#/components/responses/InternalError" },
+        },
+      },
     },
     "/api/bookings/meta/counts": {
       get: {
@@ -190,6 +278,104 @@ export const openApiSpec = {
         },
       },
     },
+    "/api/bookings/{id}/reassign": {
+      patch: {
+        tags: ["Bookings"],
+        summary: "Assign or reassign mechanic",
+        description:
+          "Attaches a mechanic to the booking. Pending bookings move to `assigned`. Emits WebSocket `booking.updated`.",
+        parameters: [
+          {
+            name: "id",
+            in: "path",
+            required: true,
+            schema: { type: "string" },
+            example: "IM-48210",
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["mechanic"],
+                properties: {
+                  mechanic: {
+                    type: "string",
+                    description: "Mechanic name or id",
+                    example: "Rahul Sharma",
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "Updated booking detail",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/BookingDetail" },
+              },
+            },
+          },
+          "400": { $ref: "#/components/responses/BadRequest" },
+          "404": { $ref: "#/components/responses/NotFound" },
+          "500": { $ref: "#/components/responses/InternalError" },
+        },
+      },
+    },
+    "/api/bookings/{id}/status": {
+      patch: {
+        tags: ["Bookings"],
+        summary: "Update booking status",
+        description: [
+          "Advances or cancels a booking. Allowed transitions:",
+          "- `pending` → `assigned` | `cancelled` (assigned requires a mechanic)",
+          "- `assigned` → `on_the_way` | `cancelled`",
+          "- `on_the_way` → `completed` | `cancelled`",
+          "",
+          "Emits WebSocket `booking.updated`.",
+        ].join("\n"),
+        parameters: [
+          {
+            name: "id",
+            in: "path",
+            required: true,
+            schema: { type: "string" },
+            example: "IM-48210",
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["status"],
+                properties: {
+                  status: { type: "string", enum: [...bookingStatus] },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "Updated booking detail",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/BookingDetail" },
+              },
+            },
+          },
+          "400": { $ref: "#/components/responses/BadRequest" },
+          "404": { $ref: "#/components/responses/NotFound" },
+          "500": { $ref: "#/components/responses/InternalError" },
+        },
+      },
+    },
     "/api/mechanics": {
       get: {
         tags: ["Mechanics"],
@@ -207,6 +393,31 @@ export const openApiSpec = {
               },
             },
           },
+          "500": { $ref: "#/components/responses/InternalError" },
+        },
+      },
+      post: {
+        tags: ["Mechanics"],
+        summary: "Add mechanic",
+        description: "Creates a mechanic. Emits WebSocket `mechanic.created`.",
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/CreateMechanicRequest" },
+            },
+          },
+        },
+        responses: {
+          "201": {
+            description: "Created mechanic",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/Mechanic" },
+              },
+            },
+          },
+          "400": { $ref: "#/components/responses/BadRequest" },
           "500": { $ref: "#/components/responses/InternalError" },
         },
       },
@@ -280,6 +491,31 @@ export const openApiSpec = {
           "500": { $ref: "#/components/responses/InternalError" },
         },
       },
+      post: {
+        tags: ["Customers"],
+        summary: "Add customer",
+        description: "Creates a customer. Emits WebSocket `customer.created`.",
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/CreateCustomerRequest" },
+            },
+          },
+        },
+        responses: {
+          "201": {
+            description: "Created customer",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/Customer" },
+              },
+            },
+          },
+          "400": { $ref: "#/components/responses/BadRequest" },
+          "500": { $ref: "#/components/responses/InternalError" },
+        },
+      },
     },
     "/api/customers/{id}": {
       get: {
@@ -309,6 +545,73 @@ export const openApiSpec = {
         type: "object",
         properties: {
           error: { type: "string", example: "Booking not found" },
+        },
+      },
+      RealtimeEvent: {
+        type: "object",
+        required: ["type", "at", "message"],
+        description: "JSON frame pushed over the `/ws` WebSocket after mutations (and on connect ping).",
+        properties: {
+          type: {
+            type: "string",
+            enum: [
+              "booking.created",
+              "booking.updated",
+              "customer.created",
+              "mechanic.created",
+              "ping",
+            ],
+            example: "booking.updated",
+          },
+          at: { type: "string", format: "date-time" },
+          message: {
+            type: "string",
+            example: "Rahul Sharma assigned to IM-48210 · Pending → Assigned",
+            description: "Human-readable text for notifications / activity",
+          },
+          data: {
+            type: "object",
+            additionalProperties: true,
+            description: "Optional payload (ids, status, names, …)",
+            example: { id: "IM-48210", status: "assigned", mechanic: "Rahul Sharma" },
+          },
+        },
+      },
+      CreateBookingRequest: {
+        type: "object",
+        required: ["customerName", "phone", "vehicle", "plate", "service", "location"],
+        properties: {
+          customerName: { type: "string", example: "Yash Sharma" },
+          phone: { type: "string", example: "+91 9610271590" },
+          email: { type: "string" },
+          zone: { type: "string" },
+          vehicle: { type: "string", example: "MG Hector 2021" },
+          plate: { type: "string", example: "MH 12 AB 1234" },
+          service: { type: "string", example: "Flat tyre change" },
+          location: { type: "string", example: "Viman Nagar, Pune" },
+          mechanic: { type: "string", description: "Optional mechanic name/id" },
+          amount: { type: "number" },
+          scheduledAt: { type: "string", format: "date-time" },
+        },
+      },
+      CreateCustomerRequest: {
+        type: "object",
+        required: ["name", "phone"],
+        properties: {
+          name: { type: "string" },
+          phone: { type: "string" },
+          email: { type: "string" },
+          zone: { type: "string" },
+        },
+      },
+      CreateMechanicRequest: {
+        type: "object",
+        required: ["name", "phone", "zone"],
+        properties: {
+          name: { type: "string" },
+          phone: { type: "string" },
+          zone: { type: "string" },
+          specialties: { type: "array", items: { type: "string" } },
         },
       },
       PaginationMeta: {
@@ -533,6 +836,14 @@ export const openApiSpec = {
       },
     },
     responses: {
+      BadRequest: {
+        description: "Invalid request",
+        content: {
+          "application/json": {
+            schema: { $ref: "#/components/schemas/Error" },
+          },
+        },
+      },
       NotFound: {
         description: "Resource not found",
         content: {
