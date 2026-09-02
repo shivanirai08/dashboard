@@ -1,36 +1,38 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Instant Mechanic — Frontend
 
-## Getting Started
+Next.js ops dashboard UI. Talks to the Express API over REST and stays live via **WebSocket**.
 
-First, run the development server:
+## Quick start
 
 ```bash
+# .env.local
+NEXT_PUBLIC_API_URL=http://localhost:4000
+
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Live updates
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+`LiveProvider` (`src/components/providers/live-provider.tsx`) opens `ws://…/ws` (derived from `NEXT_PUBLIC_API_URL`).
 
-## Learn More
+On each event (except `ping`):
 
-To learn more about Next.js, take a look at the following resources:
+1. Prepends a notification (unread → red bell dot)
+2. Dispatches `ops:refresh` so Overview / Bookings / etc. refetch via `useOpsRefresh`
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Main routes
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+| Path | Page |
+|------|------|
+| `/dashboard` | Overview |
+| `/analytics` | Charts |
+| `/bookings` | Table + drawer |
+| `/mechanics` | Fleet |
+| `/customers` | Accounts |
 
-## Deploy on Vercel
+## Deploy (Vercel)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Set `NEXT_PUBLIC_API_URL` to your public API origin. Use HTTPS API so the browser uses `wss://`.
