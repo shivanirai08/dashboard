@@ -22,8 +22,11 @@ export default function DataPage() {
       <PageHeader title="Settings & Sync" sub="Progress is saved in your browser and synced to Supabase." />
       <div className="space-y-4">
         <div className="card">
-          <div className="card-title">Exam date</div>
-          <input className="input !w-48" type="date" value={state.examDate ?? ""} onChange={(e) => setState((s) => ({ ...s, examDate: e.target.value || undefined }))} />
+          <div className="card-title">Goals</div>
+          <div className="flex flex-wrap gap-4">
+            <label><span className="label">Exam date</span><input className="input !w-48" type="date" value={state.examDate ?? ""} onChange={(e) => setState((s) => ({ ...s, examDate: e.target.value || undefined }))} /></label>
+            <label><span className="label">Daily focus goal (hours)</span><input className="input !w-48" type="number" min={0} step={0.5} value={(state.dailyGoalMin ?? 240) / 60} onChange={(e) => setState((s) => ({ ...s, dailyGoalMin: Math.round(Number(e.target.value) * 60) }))} /></label>
+          </div>
         </div>
 
         <div className="card">

@@ -1,4 +1,5 @@
-import { NavLink, Route, Routes } from "react-router-dom";
+import { useEffect } from "react";
+import { NavLink, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { LayoutDashboard, LineChart, Moon, RotateCcw, Settings, Sun, Timer, TriangleAlert } from "lucide-react";
 import Dashboard from "./pages/Dashboard";
 import Mocks from "./pages/Mocks";
@@ -23,6 +24,27 @@ export default function App() {
   const { catalog, sync } = useStore();
   const { theme, toggle } = useTheme();
   const pomo = usePomodoro();
+  const nav = useNavigate();
+  const { pathname } = useLocation();
+
+  // N = quick add · Space = start/pause timer (ignored while typing)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement;
+      if (/^(INPUT|TEXTAREA|SELECT|BUTTON)$/.test(el.tagName) || el.isContentEditable || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === "n" || e.key === "N") {
+        e.preventDefault();
+        if (pathname !== "/") nav("/");
+        window.setTimeout(() => document.getElementById("quick-add-input")?.focus(), 60);
+      } else if (e.key === " ") {
+        e.preventDefault();
+        if (pomo.running) pomo.pause();
+        else pomo.start();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [pathname, nav, pomo]);
 
   return (
     <div className="min-h-screen lg:flex">
@@ -44,6 +66,10 @@ export default function App() {
         </nav>
 
         <div className="mt-auto space-y-3">
+          <div className="px-2 text-[11px] leading-5 text-slate-400">
+            <kbd className="rounded border border-slate-300 px-1 dark:border-white/20">N</kbd> quick add ·{" "}
+            <kbd className="rounded border border-slate-300 px-1 dark:border-white/20">Space</kbd> start/pause
+          </div>
           {pomo.running && (
             <NavLink to="/focus" className="block rounded-xl bg-brand-50 px-3 py-2 text-center dark:bg-brand-500/15">
               <div className="text-[11px] uppercase text-brand-600">{pomo.mode === "open" ? "open timer" : pomo.phase} running</div>

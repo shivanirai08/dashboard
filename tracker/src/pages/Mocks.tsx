@@ -1,17 +1,20 @@
 import { useState } from "react";
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { LineChart as LineIcon, Trash2 } from "lucide-react";
+import { LineChart as LineIcon, Pencil, Trash2 } from "lucide-react";
 import { useStore } from "../lib/store";
 import { uid } from "../lib/ids";
 import { formatDate, todayISO } from "../lib/dates";
 import type { MockAttempt } from "../lib/types";
 import { Empty, Field, PageHeader } from "../components/ui";
+import { useRemove } from "../lib/undo";
 
 const blank = { name: "", source: "GateQA", type: "full" as "full" | "custom", subjects: [] as string[], date: todayISO(), score: "", maxScore: "100", timeMin: "", weak: [] as string[], notes: "" };
 
 export default function Mocks() {
   const { state, catalog, setState } = useStore();
+  const remove = useRemove();
   const [f, setF] = useState(blank);
+  const [editId, setEditId] = useState<string | null>(null);
 
   const add = () => {
     if (!f.name || f.score === "") return;
@@ -21,8 +24,16 @@ export default function Mocks() {
       score: Number(f.score), maxScore: Number(f.maxScore) || 100,
       timeMin: f.timeMin ? Number(f.timeMin) : undefined, weakSubjects: f.weak, notes: f.notes,
     };
-    setState((p) => ({ ...p, mocks: [m, ...p.mocks] }));
+    if (editId) setState((p) => ({ ...p, mocks: p.mocks.map((x) => (x.id === editId ? { ...m, id: editId } : x)) }));
+    else setState((p) => ({ ...p, mocks: [m, ...p.mocks] }));
+    setEditId(null);
     setF({ ...blank, date: f.date, source: f.source, type: f.type });
+  };
+
+  const edit = (m: MockAttempt) => {
+    setEditId(m.id);
+    setF({ name: m.name, source: m.source, type: m.type ?? "full", subjects: m.subjects ?? [], date: m.date, score: String(m.score), maxScore: String(m.maxScore), timeMin: m.timeMin ? String(m.timeMin) : "", weak: m.weakSubjects, notes: m.notes });
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const sorted = [...state.mocks].sort((a, b) => a.date.localeCompare(b.date));
@@ -38,8 +49,8 @@ export default function Mocks() {
     <>
       <PageHeader title="Mock Analysis" sub="Take mocks on GateQA, log them here, spot the patterns." />
 
-      <div className="card">
-        <div className="card-title">Log a mock</div>
+      <div className={`card ${editId ? "ring-2 ring-brand-500" : ""}`}>
+        <div className="card-title">{editId ? "Edit mock" : "Log a mock"}</div>
         <div className="grid gap-3 sm:grid-cols-6">
           <Field label="Name" className="sm:col-span-3"><input className="input" placeholder="e.g. GateQA Full Mock 4" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></Field>
           <Field label="Source" className="sm:col-span-2"><input className="input" placeholder="GateQA, GO, test series…" value={f.source} onChange={(e) => setF({ ...f, source: e.target.value })} /></Field>
@@ -76,7 +87,10 @@ export default function Mocks() {
             </div>
           </div>
           <Field label="Notes" className="sm:col-span-5"><input className="input" placeholder="What went wrong / right?" value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} /></Field>
-          <div className="flex items-end"><button className="btn w-full" onClick={add}>Add mock</button></div>
+          <div className="flex items-end gap-2">
+            <button className="btn flex-1" onClick={add}>{editId ? "Save" : "Add mock"}</button>
+            {editId && <button className="btn-ghost" onClick={() => { setEditId(null); setF(blank); }}>Cancel</button>}
+          </div>
         </div>
       </div>
 
@@ -117,7 +131,7 @@ export default function Mocks() {
                 <td className="td"><span className="chip bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300">{m.score}/{m.maxScore}</span></td>
                 <td className="td text-slate-500">{m.timeMin ? `${m.timeMin}m` : "–"}</td>
                 <td className="td text-xs text-slate-500">{m.weakSubjects.join(", ") || "–"}</td>
-                <td className="td"><button className="icon-btn" aria-label="Delete" onClick={() => setState((p) => ({ ...p, mocks: p.mocks.filter((x) => x.id !== m.id) }))}><Trash2 size={15} /></button></td>
+                <td className="td whitespace-nowrap"><button className="icon-btn hover:!text-brand-600" aria-label="Edit" onClick={() => edit(m)}><Pencil size={14} /></button><button className="icon-btn" aria-label="Delete" onClick={() => remove("mocks", m.id, "Mock")}><Trash2 size={15} /></button></td>
               </tr>
             ))}
           </tbody>

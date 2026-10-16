@@ -25,9 +25,11 @@ type PomodoroApi = {
   breakMin: number;
   label: string;
   setLabel: (s: string) => void;
+  subject: string;
+  setSubject: (s: string) => void;
   taskId: string | null;
   /** attach the running/next session to a task (its time gets logged there) */
-  focusOnTask: (id: string, title: string) => void;
+  focusOnTask: (id: string, title: string, subject?: string) => void;
   start: () => void;
   pause: () => void;
   reset: () => void;
@@ -52,6 +54,9 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
   const [running, setRunning] = useState(false);
   const [label, setLabel] = useState("");
   const [taskId, setTaskId] = useState<string | null>(null);
+  const [subject, setSubject] = useState("");
+  const subjectRef = useRef(subject);
+  subjectRef.current = subject;
   const labelRef = useRef(label);
   labelRef.current = label;
   const runStart = useRef<Date | null>(null); // when the current run first started
@@ -68,7 +73,7 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
       setState((prev) => ({
         ...prev,
         pomodoros: [
-          { id: uid(), startedAt: start.toISOString(), endedAt: end.toISOString(), minutes, label: labelRef.current.trim() || undefined, taskId: tid, kind: "focus" },
+          { id: uid(), startedAt: start.toISOString(), endedAt: end.toISOString(), minutes, label: labelRef.current.trim() || undefined, taskId: tid, subject: subjectRef.current || undefined, kind: "focus" },
           ...prev.pomodoros,
         ],
         todos: tid ? prev.todos.map((t) => (t.id === tid ? { ...t, timeMin: (t.timeMin ?? 0) + minutes } : t)) : prev.todos,
@@ -125,9 +130,10 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
     [focusMin],
   );
 
-  const focusOnTask = useCallback((id: string, title: string) => {
+  const focusOnTask = useCallback((id: string, title: string, subj?: string) => {
     setTaskId(id);
     setLabel(title);
+    if (subj) setSubject(subj);
     setState((prev) => ({ ...prev, todos: prev.todos.map((t) => (t.id === id && t.status === "todo" ? { ...t, status: "doing" } : t)) }));
     runStart.current ??= new Date();
     setRunning(true);
@@ -181,6 +187,8 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
         setLabel(s);
         setTaskId(null);
       },
+      subject,
+      setSubject,
       taskId,
       focusOnTask,
       start,
@@ -198,7 +206,7 @@ export function PomodoroProvider({ children }: { children: ReactNode }) {
         if (!running && mode === "pomodoro" && phase === "break") setRemaining(n * 60);
       },
     }),
-    [mode, setMode, phase, remaining, running, focusMin, breakMin, label, taskId, focusOnTask, start, pause, reset, skip, elapsed, finish],
+    [mode, setMode, phase, remaining, running, focusMin, breakMin, label, subject, taskId, focusOnTask, start, pause, reset, skip, elapsed, finish],
   );
 
   return <PomodoroContext.Provider value={value}>{children}</PomodoroContext.Provider>;

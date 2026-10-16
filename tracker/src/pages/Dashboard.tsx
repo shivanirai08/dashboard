@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
-import { CheckCircle2, Flame, Target } from "lucide-react";
+import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { CalendarRange, CheckCircle2, Flame, Target } from "lucide-react";
 import { useStore } from "../lib/store";
 import { formatClock, usePomodoro } from "../lib/pomodoro";
 import TimerControls from "../components/TimerControls";
@@ -25,6 +25,29 @@ export default function Dashboard() {
     if (series[i].min > 0) streak++;
     else if (i !== days.length - 1) break;
   }
+
+  const weekStart = addDays(today, -6);
+  const prevStart = addDays(today, -13);
+  const inRange = (iso: string | undefined, from: string, to: string) => {
+    if (!iso) return false;
+    const d = iso.length > 10 ? new Date(iso).toLocaleDateString("sv-SE") : iso;
+    return d >= from && d <= to;
+  };
+  const weekSessions = focus.filter((x) => inRange(x.startedAt, weekStart, today));
+  const weekMin = weekSessions.reduce((a, x) => a + x.minutes, 0);
+  const prevMin = focus.filter((x) => inRange(x.startedAt, prevStart, addDays(today, -7))).reduce((a, x) => a + x.minutes, 0);
+  const weekMocks = state.mocks.filter((m) => inRange(m.date, weekStart, today));
+  const weekMockAvg = weekMocks.length ? Math.round(weekMocks.reduce((a, m) => a + (m.score / m.maxScore) * 100, 0) / weekMocks.length) : null;
+  const diff = weekMin - prevMin;
+  const week: [string, string | number, string?][] = [
+    ["Focus time", `${(weekMin / 60).toFixed(1)}h`, prevMin || weekMin ? `${diff >= 0 ? "▲" : "▼"} ${Math.abs(Math.round(diff / 6) / 10)}h vs last week` : undefined],
+    ["Tasks done", state.todos.filter((t) => t.status === "done" && inRange(t.doneAt, weekStart, today)).length],
+    ["Mocks", weekMocks.length, weekMockAvg !== null ? `avg ${weekMockAvg}%` : undefined],
+    ["Mistakes logged", state.mistakes.filter((m) => inRange(m.date, weekStart, today)).length],
+  ];
+  const bySubject = Object.entries(weekSessions.reduce<Record<string, number>>((acc, x) => ({ ...acc, [x.subject ?? "Unspecified"]: (acc[x.subject ?? "Unspecified"] ?? 0) + x.minutes }), {}))
+    .map(([subject, min]) => ({ subject, min }))
+    .sort((a, b) => b.min - a.min);
 
   const dueRev = state.revisions.filter((r) => daysUntil(r.nextDue) <= 0);
   const todos = state.todos.filter((t) => t.status !== "done");
@@ -97,6 +120,24 @@ export default function Dashboard() {
         </div>
 
         <div className="card">
+          <div className="card-title flex items-center gap-2"><CalendarRange size={15} /> This week</div>
+          <dl className="grid grid-cols-2 gap-3 text-sm">
+            {week.map(([l, v, sub]) => (
+              <div key={l}><dt className="text-xs text-slate-500">{l}</dt><dd className="text-xl font-bold text-slate-900 dark:text-white">{v}</dd>{sub && <dd className="text-xs text-slate-400">{sub}</dd>}</div>
+            ))}
+          </dl>
+        </div>
+
+        <div className="card lg:col-span-2">
+          <div className="card-title">Time by subject · last 7 days</div>
+          {bySubject.length ? (
+            <ResponsiveContainer width="100%" height={Math.max(120, bySubject.length * 30)}>
+              <BarChart data={bySubject} layout="vertical"><XAxis type="number" hide /><YAxis type="category" dataKey="subject" width={140} fontSize={11} tickLine={false} axisLine={false} /><Tooltip cursor={{ fill: "rgba(99,102,241,.08)" }} formatter={(v) => [`${v} min`, "Focus"]} /><Bar dataKey="min" fill="#8b5cf6" radius={[0, 6, 6, 0]} /></BarChart>
+            </ResponsiveContainer>
+          ) : <Empty icon={<Target />} text="Pick a subject when you start a session" />}
+        </div>
+
+        <div className="card">
           <div className="card-title">Revise today</div>
           {dueRev.length ? dueRev.slice(0, 5).map((r) => (
             <div key={r.id} className="flex items-center gap-2 border-b border-slate-100 py-2 text-sm last:border-0 dark:border-white/5"><span className="min-w-0 flex-1 truncate">{r.topic}<span className="ml-2 text-xs text-slate-500">{r.subject}</span></span><button className="chip cursor-pointer bg-emerald-100 text-emerald-700 hover:brightness-95 dark:bg-emerald-500/15 dark:text-emerald-300" onClick={() => markRevised(r.id)}>Done</button></div>
@@ -119,6 +160,10 @@ export default function Dashboard() {
 
 function FocusNow() {
   const p = usePomodoro();
+  const { state, catalog } = useStore();
+  const goal = state.dailyGoalMin ?? 240;
+  const today = state.pomodoros.filter((x) => x.kind === "focus" && isSameDay(x.startedAt)).reduce((a, x) => a + x.minutes, 0);
+  const pct = Math.min(100, Math.round((today / goal) * 100));
   return (
     <div className="card lg:col-span-2">
       <div className="card-title">Focus now</div>
@@ -131,7 +176,16 @@ function FocusNow() {
           <button key={m} onClick={() => p.setMode(m)} className={`cursor-pointer rounded-md px-3 py-0.5 ${p.mode === m ? "bg-brand-500 text-white" : "text-slate-500"}`}>{l}</button>
         ))}
       </div>
-      <input className="input mt-3" placeholder="What are you working on?" value={p.label} onChange={(e) => p.setLabel(e.target.value)} />
+      <div className="mt-3 flex gap-2">
+        <input className="input min-w-0 flex-1" placeholder="Working on…" value={p.label} onChange={(e) => p.setLabel(e.target.value)} />
+        <select className="input !w-36" value={p.subject} onChange={(e) => p.setSubject(e.target.value)}>
+          <option value="">Subject</option>{catalog.subjects.map((x) => <option key={x}>{x}</option>)}
+        </select>
+      </div>
+      <div className="mt-3">
+        <div className="mb-1 flex justify-between text-xs text-slate-500"><span>Daily goal</span><span>{today} / {goal} min</span></div>
+        <div className="h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-white/10"><div className="h-full rounded-full bg-gradient-to-r from-brand-500 to-violet-500 transition-all" style={{ width: `${pct}%` }} /></div>
+      </div>
     </div>
   );
 }
@@ -176,7 +230,7 @@ function QuickAdd() {
         {(tab === "mistake" || tab === "revision") && (
           <select className="input !w-auto" value={subject} onChange={(e) => setSubject(e.target.value)}>{catalog.subjects.map((x) => <option key={x}>{x}</option>)}</select>
         )}
-        <input className="input min-w-0 flex-1" placeholder={ph} value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submit()} />
+        <input id="quick-add-input" className="input min-w-0 flex-1" placeholder={ph} value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submit()} />
         {tab === "mock" && (
           <>
             <input className="input !w-20" type="number" placeholder="Score" value={score} onChange={(e) => setScore(e.target.value)} />

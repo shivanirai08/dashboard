@@ -6,6 +6,7 @@ import { uid } from "../lib/ids";
 import { addDays, daysUntil, formatDate, isSameDay, todayISO } from "../lib/dates";
 import { Empty, PageHeader } from "../components/ui";
 import TimerControls from "../components/TimerControls";
+import { useRemove } from "../lib/undo";
 import type { Priority, TodoItem, TodoStatus } from "../lib/types";
 
 const COLS: { key: TodoStatus; label: string; dot: string }[] = [
@@ -29,15 +30,17 @@ const sessionRange = (start: string, end?: string) => {
 const fmtMin = (m: number) => (m >= 60 ? `${Math.floor(m / 60)}h${m % 60 ? ` ${m % 60}m` : ""}` : `${m}m`);
 
 export default function Focus() {
-  const { state, setState } = useStore();
+  const { state, catalog, setState } = useStore();
+  const remove = useRemove();
   const p = usePomodoro();
   const [title, setTitle] = useState("");
   const [due, setDue] = useState("");
   const [prio, setPrio] = useState<Priority>("med");
+  const [subj, setSubj] = useState("");
 
   const add = () => {
     if (!title.trim()) return;
-    setState((s) => ({ ...s, todos: [{ id: uid(), title: title.trim(), status: "todo", priority: prio, due: due || undefined, createdAt: todayISO() }, ...s.todos] }));
+    setState((s) => ({ ...s, todos: [{ id: uid(), title: title.trim(), status: "todo", priority: prio, subject: subj || undefined, due: due || undefined, createdAt: todayISO() }, ...s.todos] }));
     setTitle("");
     setDue("");
   };
@@ -97,6 +100,9 @@ export default function Focus() {
           </div>
           <div className="mt-4"><TimerControls /></div>
           <input className="input mt-4" placeholder="What are you working on?" value={p.label} onChange={(e) => p.setLabel(e.target.value)} />
+          <select className="input mt-2" value={p.subject} onChange={(e) => p.setSubject(e.target.value)}>
+            <option value="">Subject (optional)</option>{catalog.subjects.map((s) => <option key={s}>{s}</option>)}
+          </select>
           {p.taskId && <div className="mt-2 text-xs text-indigo-500">Time will be added to this task</div>}
           <div className={`mt-4 flex gap-3 text-xs text-slate-500 ${open_ ? "hidden" : ""}`}>
             <label>Focus min <input className="input !w-16 !py-1" type="number" min={1} value={p.focusMin} onChange={(e) => p.setFocusMin(Math.max(1, Number(e.target.value)))} /></label>
@@ -109,7 +115,7 @@ export default function Focus() {
           {focusSessions.slice(0, 8).map((x) => (
             <div key={x.id} className="flex items-center gap-3 border-b border-slate-100 py-2 text-sm last:border-0 dark:border-white/5">
               <span className="chip bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300">{fmtMin(x.minutes)}</span>
-              <span className="min-w-0 flex-1 truncate text-slate-900 dark:text-white">{x.label ?? "Focus session"}</span>
+              <span className="min-w-0 flex-1 truncate text-slate-900 dark:text-white">{x.label ?? "Focus session"}{x.subject && <span className="ml-2 text-xs text-slate-400">{x.subject}</span>}</span>
               <span className="whitespace-nowrap text-xs text-slate-400">{sessionRange(x.startedAt, x.endedAt)}</span>
             </div>
           ))}
@@ -120,6 +126,9 @@ export default function Focus() {
       <div className="card mt-4">
         <div className="flex flex-wrap gap-2">
           <input className="input min-w-0 flex-1" placeholder="Add a task and press Enter…" value={title} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => e.key === "Enter" && add()} />
+          <select className="input !w-44" value={subj} onChange={(e) => setSubj(e.target.value)}>
+            <option value="">No subject</option>{catalog.subjects.map((s) => <option key={s}>{s}</option>)}
+          </select>
           <input className="input !w-40" type="date" value={due} onChange={(e) => setDue(e.target.value)} />
           <button className={`chip cursor-pointer ${PRIO[prio].cls}`} onClick={() => setPrio(nextPrio[prio])} title="Click to change priority">{PRIO[prio].label} priority</button>
           <button className="btn" onClick={add}>Add</button>
@@ -140,11 +149,12 @@ export default function Focus() {
                   <div key={t.id} className="card !p-3">
                     <div className="flex items-start gap-2">
                       <input className={`w-full min-w-0 bg-transparent text-sm font-medium outline-none ${t.status === "done" ? "text-slate-500" : "text-slate-900 dark:text-white"}`} value={t.title} onChange={(e) => patch(t.id, { title: e.target.value })} />
-                      <button className="icon-btn !size-6 shrink-0" aria-label="Delete" onClick={() => setState((s) => ({ ...s, todos: s.todos.filter((x) => x.id !== t.id) }))}><Trash2 size={13} /></button>
+                      <button className="icon-btn !size-6 shrink-0" aria-label="Delete" onClick={() => remove("todos", t.id, "Task")}><Trash2 size={13} /></button>
                     </div>
 
                     <div className="mt-2 flex flex-wrap items-center gap-1.5">
                       <button className={`chip cursor-pointer ${PRIO[t.priority ?? "med"].cls}`} onClick={() => patch(t.id, { priority: nextPrio[t.priority ?? "med"] })} title="Change priority">{PRIO[t.priority ?? "med"].label}</button>
+                      {t.subject && <span className="chip bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300">{t.subject}</span>}
                       {dueChip(t)}
                       {!!t.extensions && <span className="chip bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-300" title={t.originalDue ? `Originally ${formatDate(t.originalDue)}` : undefined}>extended ×{t.extensions}</span>}
                       {!!t.timeMin && <span className="chip bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300"><Clock size={12} className="mr-1" />{fmtMin(t.timeMin)}</span>}
@@ -161,7 +171,7 @@ export default function Focus() {
                           <span className="w-14 text-slate-400">Log time</span>
                           {[15, 30, 60].map((m) => <button key={m} className="chip cursor-pointer border border-slate-200 hover:bg-slate-100 dark:border-white/10 dark:hover:bg-white/10" onClick={() => logTime(t, m)}>+{m}m</button>)}
                           <button className="chip cursor-pointer border border-slate-200 hover:bg-slate-100 dark:border-white/10 dark:hover:bg-white/10" onClick={() => { const v = Number(prompt("Minutes to add (negative to subtract)")); if (v) logTime(t, v); }}>custom</button>
-                          <button className="chip ml-auto cursor-pointer bg-indigo-600 text-white hover:brightness-110" onClick={() => p.focusOnTask(t.id, t.title)}><Play size={11} className="mr-1" />Focus</button>
+                          <button className="chip ml-auto cursor-pointer bg-indigo-600 text-white hover:brightness-110" onClick={() => p.focusOnTask(t.id, t.title, t.subject)}><Play size={11} className="mr-1" />Focus</button>
                         </div>
                       </div>
                     )}

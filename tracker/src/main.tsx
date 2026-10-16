@@ -5,14 +5,17 @@ import './index.css'
 import App from './App.tsx'
 import { StoreProvider } from './lib/store.tsx'
 import { PomodoroProvider } from './lib/pomodoro.tsx'
+import { ToastProvider } from './components/Toast.tsx'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <StoreProvider>
       <PomodoroProvider>
-        <HashRouter>
-          <App />
-        </HashRouter>
+        <ToastProvider>
+          <HashRouter>
+            <App />
+          </HashRouter>
+        </ToastProvider>
       </PomodoroProvider>
     </StoreProvider>
   </StrictMode>,

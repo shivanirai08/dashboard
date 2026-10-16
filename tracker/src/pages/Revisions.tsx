@@ -4,12 +4,14 @@ import { useStore } from "../lib/store";
 import { uid } from "../lib/ids";
 import { addDays, daysUntil, formatDate, todayISO } from "../lib/dates";
 import { Empty, Field, PageHeader } from "../components/ui";
+import { useRemove } from "../lib/undo";
 
 // spaced repetition: each successful review pushes the next one further out
 const next = (d: number) => (d < 1 ? 1 : d < 3 ? 3 : d < 7 ? 7 : d < 14 ? 14 : d < 30 ? 30 : 60);
 
 export default function Revisions() {
   const { state, catalog, setState } = useStore();
+  const remove = useRemove();
   const [f, setF] = useState({ subject: catalog.subjects[0], topic: "", notes: "" });
 
   const add = () => {
@@ -45,7 +47,7 @@ export default function Revisions() {
         <span className="text-xs text-slate-400">every {r.intervalDays}d</span>
         <button className="btn !py-1.5" onClick={() => review(r.id, true)}>Revised</button>
         <button className="btn-ghost !py-1.5" onClick={() => review(r.id, false)}>Forgot</button>
-        <button className="icon-btn" aria-label="Delete" onClick={() => setState((p) => ({ ...p, revisions: p.revisions.filter((x) => x.id !== r.id) }))}><Trash2 size={15} /></button>
+        <button className="icon-btn" aria-label="Delete" onClick={() => remove("revisions", r.id, "Topic")}><Trash2 size={15} /></button>
       </div>
     );
   };

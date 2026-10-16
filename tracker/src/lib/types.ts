@@ -50,6 +50,7 @@ export type TodoItem = {
   title: string;
   status: TodoStatus;
   priority?: Priority;
+  subject?: string;
   due?: string;
   /** deadline pushed back this many times */
   extensions?: number;
@@ -68,6 +69,7 @@ export type PomodoroSession = {
   kind: "focus" | "break";
   label?: string;
   taskId?: string;
+  subject?: string;
 };
 
 export type AppState = {
@@ -77,4 +79,6 @@ export type AppState = {
   todos: TodoItem[];
   pomodoros: PomodoroSession[];
   examDate?: string;
+  /** daily focus goal in minutes */
+  dailyGoalMin?: number;
 };
