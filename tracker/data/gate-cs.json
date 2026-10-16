@@ -1,11 +1,6 @@
 {
   "exam": "GATE CSE",
   "target": "GATE 2027",
-  "hubs": {
-    "gateqaPyq": "https://gateqa.in/gate-cs-pyq/",
-    "gateqaMocks": "https://gateqa.in/mock-tests/",
-    "gateoverflow": "https://gateoverflow.in/"
-  },
   "subjects": [
     "General Aptitude",
     "Engineering Mathematics",

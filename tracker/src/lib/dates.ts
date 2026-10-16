@@ -1,11 +1,16 @@
+// local calendar date (toISOString would give the UTC date, wrong for IST mornings)
+function localISO(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 export function todayISO(): string {
-  return new Date().toISOString().slice(0, 10);
+  return localISO(new Date());
 }
 
 export function addDays(isoDate: string, days: number): string {
   const d = new Date(`${isoDate}T12:00:00`);
   d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
+  return localISO(d);
 }
 
 export function formatDate(iso: string): string {
@@ -24,5 +29,6 @@ export function daysUntil(iso: string): number {
 }
 
 export function isSameDay(iso: string, day = todayISO()): boolean {
-  return iso.slice(0, 10) === day;
+  // full timestamps are compared by their local date
+  return (iso.length > 10 ? localISO(new Date(iso)) : iso) === day;
 }

@@ -1,7 +1,6 @@
 export type Catalog = {
   exam: string;
   target: string;
-  hubs: { gateqaPyq: string; gateqaMocks: string; gateoverflow: string };
   subjects: string[];
 };
 
@@ -30,7 +29,6 @@ export type Mistake = {
   kind: MistakeKind;
   question: string;
   fix: string;
-  link?: string;
   resolved: boolean;
 };
 
@@ -65,6 +63,7 @@ export type TodoItem = {
 export type PomodoroSession = {
   id: string;
   startedAt: string;
+  endedAt?: string;
   minutes: number;
   kind: "focus" | "break";
   label?: string;

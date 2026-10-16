@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { CalendarClock, CheckCircle2, Clock, Pause, Play, RotateCcw, SkipForward, Square, Trash2 } from "lucide-react";
+import { CalendarClock, CheckCircle2, Clock, Play, Trash2 } from "lucide-react";
 import { useStore } from "../lib/store";
 import { formatClock, usePomodoro } from "../lib/pomodoro";
 import { uid } from "../lib/ids";
 import { addDays, daysUntil, formatDate, isSameDay, todayISO } from "../lib/dates";
 import { Empty, PageHeader } from "../components/ui";
+import TimerControls from "../components/TimerControls";
 import type { Priority, TodoItem, TodoStatus } from "../lib/types";
 
 const COLS: { key: TodoStatus; label: string; dot: string }[] = [
@@ -18,6 +19,12 @@ const PRIO: Record<Priority, { label: string; cls: string }> = {
   low: { label: "Low", cls: "bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-slate-300" },
 };
 const nextPrio: Record<Priority, Priority> = { low: "med", med: "high", high: "low" };
+
+const clock = (iso: string) => new Date(iso).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" });
+const sessionRange = (start: string, end?: string) => {
+  const day = new Date(start).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+  return end ? `${day} · ${clock(start)} – ${clock(end)}` : `${day} · ${clock(start)}`;
+};
 
 const fmtMin = (m: number) => (m >= 60 ? `${Math.floor(m / 60)}h${m % 60 ? ` ${m % 60}m` : ""}` : `${m}m`);
 
@@ -84,19 +91,11 @@ export default function Focus() {
               <circle cx="100" cy="100" r={R} fill="none" stroke={color} strokeWidth="10" strokeLinecap="round" strokeDasharray={C} strokeDashoffset={C - offset} style={{ transition: "stroke-dashoffset 1s linear" }} />
             </svg>
             <div className="absolute inset-0 grid place-content-center text-center">
-              <div className="text-xs font-semibold uppercase tracking-widest" style={{ color }}>{open_ ? "elapsed" : p.phase}</div>
+              <div className="text-xs font-semibold uppercase tracking-widest" style={{ color }}>{open_ ? "stopwatch" : p.phase}</div>
               <div className="font-mono text-5xl font-bold text-slate-900 dark:text-white">{formatClock(p.remaining)}</div>
             </div>
           </div>
-          <div className="mt-4 flex gap-2">
-            {p.running ? <button className="btn" onClick={p.pause}><Pause size={16} />Pause</button> : <button className="btn" onClick={p.start}><Play size={16} />Start</button>}
-            <button className="btn-ghost" onClick={p.reset} aria-label="Reset"><RotateCcw size={16} /></button>
-            {open_ ? (
-              <button className="btn-ghost" onClick={p.finish} disabled={p.remaining < 30}><Square size={14} />Done &amp; log</button>
-            ) : (
-              <button className="btn-ghost" onClick={p.skip} aria-label="Skip"><SkipForward size={16} /></button>
-            )}
-          </div>
+          <div className="mt-4"><TimerControls /></div>
           <input className="input mt-4" placeholder="What are you working on?" value={p.label} onChange={(e) => p.setLabel(e.target.value)} />
           {p.taskId && <div className="mt-2 text-xs text-indigo-500">Time will be added to this task</div>}
           <div className={`mt-4 flex gap-3 text-xs text-slate-500 ${open_ ? "hidden" : ""}`}>
@@ -111,7 +110,7 @@ export default function Focus() {
             <div key={x.id} className="flex items-center gap-3 border-b border-slate-100 py-2 text-sm last:border-0 dark:border-white/5">
               <span className="chip bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300">{fmtMin(x.minutes)}</span>
               <span className="min-w-0 flex-1 truncate text-slate-900 dark:text-white">{x.label ?? "Focus session"}</span>
-              <span className="text-xs text-slate-400">{new Date(x.startedAt).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}</span>
+              <span className="whitespace-nowrap text-xs text-slate-400">{sessionRange(x.startedAt, x.endedAt)}</span>
             </div>
           ))}
           {!focusSessions.length && <Empty icon={<Play size={28} />} text="Finished sessions show up here" />}
@@ -140,7 +139,7 @@ export default function Focus() {
                 {list.map((t) => (
                   <div key={t.id} className="card !p-3">
                     <div className="flex items-start gap-2">
-                      <input className={`w-full min-w-0 bg-transparent text-sm font-medium outline-none ${t.status === "done" ? "text-slate-400 line-through" : "text-slate-900 dark:text-white"}`} value={t.title} onChange={(e) => patch(t.id, { title: e.target.value })} />
+                      <input className={`w-full min-w-0 bg-transparent text-sm font-medium outline-none ${t.status === "done" ? "text-slate-500" : "text-slate-900 dark:text-white"}`} value={t.title} onChange={(e) => patch(t.id, { title: e.target.value })} />
                       <button className="icon-btn !size-6 shrink-0" aria-label="Delete" onClick={() => setState((s) => ({ ...s, todos: s.todos.filter((x) => x.id !== t.id) }))}><Trash2 size={13} /></button>
                     </div>
 

@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
-import { CheckCircle2, ExternalLink, Flame, Pause, Play, Target } from "lucide-react";
+import { CheckCircle2, Flame, Target } from "lucide-react";
 import { useStore } from "../lib/store";
 import { formatClock, usePomodoro } from "../lib/pomodoro";
+import TimerControls from "../components/TimerControls";
 import { uid } from "../lib/ids";
 import { addDays, daysUntil, formatDate, isSameDay, todayISO } from "../lib/dates";
 import { Empty, PageHeader } from "../components/ui";
@@ -51,9 +52,6 @@ export default function Dashboard() {
   return (
     <>
       <PageHeader title={`Good ${hour < 12 ? "morning" : hour < 18 ? "afternoon" : "evening"} 👋`} sub={left !== null ? `${left} days to ${catalog.target}` : `Preparing for ${catalog.target} · set your exam date in Settings`}>
-        <a className="btn-ghost" href={catalog.hubs.gateqaPyq} target="_blank" rel="noreferrer">GateQA PYQs <ExternalLink size={13} /></a>
-        <a className="btn" href={catalog.hubs.gateqaMocks} target="_blank" rel="noreferrer">Custom mock <ExternalLink size={13} /></a>
-        <a className="btn-ghost" href={catalog.hubs.gateoverflow} target="_blank" rel="noreferrer">GateOverflow <ExternalLink size={13} /></a>
       </PageHeader>
 
       <div className="mb-4 grid gap-4 lg:grid-cols-5">
@@ -126,9 +124,7 @@ function FocusNow() {
       <div className="card-title">Focus now</div>
       <div className="flex items-center gap-4">
         <div className="font-mono text-4xl font-bold text-slate-900 dark:text-white">{formatClock(p.remaining)}</div>
-        <button className="btn" onClick={p.running ? p.pause : p.start}>{p.running ? <><Pause size={15} />Pause</> : <><Play size={15} />Start</>}</button>
-        {p.mode === "open" && <button className="btn-ghost" onClick={p.finish} disabled={p.remaining < 30}>Done &amp; log</button>}
-        <span className="text-xs uppercase tracking-wider text-slate-400">{p.mode === "open" ? "open" : p.phase}</span>
+        <TimerControls />
       </div>
       <div className="mt-3 inline-flex rounded-lg border border-slate-200 p-0.5 text-xs dark:border-white/10">
         {([["pomodoro", "Pomodoro"], ["open", "Open"]] as const).map(([m, l]) => (

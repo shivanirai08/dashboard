@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ExternalLink, Trash2, TriangleAlert, Undo2, Check } from "lucide-react";
+import { Trash2, TriangleAlert, Undo2, Check } from "lucide-react";
 import { useStore } from "../lib/store";
 import { uid } from "../lib/ids";
 import { formatDate, todayISO } from "../lib/dates";
@@ -16,14 +16,14 @@ const kinds: Record<MistakeKind, string> = {
 
 export default function Mistakes() {
   const { state, catalog, setState } = useStore();
-  const blank = { subject: catalog.subjects[0], topic: "", kind: "concept" as MistakeKind, question: "", fix: "", link: "" };
+  const blank = { subject: catalog.subjects[0], topic: "", kind: "concept" as MistakeKind, question: "", fix: "" };
   const [f, setF] = useState(blank);
   const [filter, setFilter] = useState<"open" | "resolved" | "all">("open");
   const [kind, setKind] = useState<MistakeKind | "">("");
 
   const add = () => {
     if (!f.question) return;
-    const m: Mistake = { id: uid(), date: todayISO(), ...f, link: f.link || undefined, resolved: false };
+    const m: Mistake = { id: uid(), date: todayISO(), ...f, resolved: false };
     setState((p) => ({ ...p, mistakes: [m, ...p.mistakes] }));
     setF({ ...blank, subject: f.subject });
   };
@@ -39,8 +39,7 @@ export default function Mistakes() {
           <Field label="Subject" className="sm:col-span-2"><select className="input" value={f.subject} onChange={(e) => setF({ ...f, subject: e.target.value })}>{catalog.subjects.map((s) => <option key={s}>{s}</option>)}</select></Field>
           <Field label="Topic" className="sm:col-span-2"><input className="input" placeholder="e.g. Paging" value={f.topic} onChange={(e) => setF({ ...f, topic: e.target.value })} /></Field>
           <Field label="Mistake type" className="sm:col-span-2"><select className="input" value={f.kind} onChange={(e) => setF({ ...f, kind: e.target.value as MistakeKind })}>{Object.keys(kinds).map((k) => <option key={k}>{k}</option>)}</select></Field>
-          <Field label="What went wrong" className="sm:col-span-4"><input className="input" value={f.question} onChange={(e) => setF({ ...f, question: e.target.value })} /></Field>
-          <Field label="Question link (GateQA / GO)" className="sm:col-span-2"><input className="input" placeholder="https://…" value={f.link} onChange={(e) => setF({ ...f, link: e.target.value })} /></Field>
+          <Field label="What went wrong" className="sm:col-span-6"><input className="input" value={f.question} onChange={(e) => setF({ ...f, question: e.target.value })} /></Field>
           <Field label="Correct approach / lesson" className="sm:col-span-5"><input className="input" value={f.fix} onChange={(e) => setF({ ...f, fix: e.target.value })} /></Field>
           <div className="flex items-end"><button className="btn w-full" onClick={add}>Log it</button></div>
         </div>
@@ -65,7 +64,6 @@ export default function Mistakes() {
               <span className={`chip ${kinds[m.kind]}`}>{m.kind}</span>
               <span className="text-xs text-slate-500">{m.subject}{m.topic && ` › ${m.topic}`} · {formatDate(m.date)}</span>
               <div className="ml-auto flex items-center">
-                {m.link && <a className="icon-btn hover:!text-brand-600" href={m.link} target="_blank" rel="noreferrer" aria-label="Open question"><ExternalLink size={15} /></a>}
                 <button className="icon-btn hover:!text-emerald-500" aria-label={m.resolved ? "Reopen" : "Resolve"} onClick={() => patch(m.id, { resolved: !m.resolved })}>{m.resolved ? <Undo2 size={15} /> : <Check size={16} />}</button>
                 <button className="icon-btn" aria-label="Delete" onClick={() => setState((p) => ({ ...p, mistakes: p.mistakes.filter((x) => x.id !== m.id) }))}><Trash2 size={15} /></button>
               </div>

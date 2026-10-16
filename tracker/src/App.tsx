@@ -1,5 +1,5 @@
 import { NavLink, Route, Routes } from "react-router-dom";
-import { ExternalLink, LayoutDashboard, LineChart, Moon, RotateCcw, Settings, Sun, Timer, TriangleAlert } from "lucide-react";
+import { LayoutDashboard, LineChart, Moon, RotateCcw, Settings, Sun, Timer, TriangleAlert } from "lucide-react";
 import Dashboard from "./pages/Dashboard";
 import Mocks from "./pages/Mocks";
 import Mistakes from "./pages/Mistakes";
@@ -23,7 +23,6 @@ export default function App() {
   const { catalog, sync } = useStore();
   const { theme, toggle } = useTheme();
   const pomo = usePomodoro();
-  const h = catalog.hubs;
 
   return (
     <div className="min-h-screen lg:flex">
@@ -43,15 +42,6 @@ export default function App() {
             </NavLink>
           ))}
         </nav>
-
-        <div className="mt-6 px-2">
-          <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Practice on</div>
-          {[["GateQA · PYQs", h.gateqaPyq], ["GateQA · Custom mocks", h.gateqaMocks], ["GateOverflow", h.gateoverflow]].map(([l, u]) => (
-            <a key={l} href={u} target="_blank" rel="noreferrer" className="flex items-center justify-between rounded-lg px-2 py-1.5 text-sm text-slate-500 hover:text-brand-600">
-              {l}<ExternalLink size={13} />
-            </a>
-          ))}
-        </div>
 
         <div className="mt-auto space-y-3">
           {pomo.running && (
