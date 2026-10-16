@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { CalendarDays, CheckCircle2, RotateCcw, Trash2 } from "lucide-react";
+import { CalendarDays, CheckCircle2, Pencil, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { useStore } from "../lib/store";
 import { addDays, daysUntil, formatDate, todayISO } from "../lib/dates";
 import { Empty, PageHeader } from "../components/ui";
 import SubjectPicker from "../components/SubjectPicker";
+import TaskDialog, { type TaskDraft } from "../components/TaskDialog";
 import PlayButton from "../components/PlayButton";
 import { useRemove } from "../lib/undo";
 import { useTasks } from "../lib/useTasks";
@@ -21,6 +22,8 @@ export default function Revisions() {
   const [topic, setTopic] = useState("");
   const [subjects, setSubjects] = useState<string[]>([]);
   const [notes, setNotes] = useState("");
+  const [draft, setDraft] = useState<TaskDraft | null>(null);
+  const del = (t: TodoItem) => { setDraft(null); remove("todos", t.id, "Revision"); };
 
   const add = () => {
     if (!topic.trim()) return;
@@ -42,7 +45,7 @@ export default function Revisions() {
     return (
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-slate-100 py-3 last:border-0 dark:border-white/5">
         <div className="min-w-[12rem] flex-1 basis-full sm:basis-48">
-          <div className="font-medium text-slate-900 dark:text-white">{t.title}</div>
+          <button className="cursor-pointer text-left font-medium text-slate-900 hover:text-brand-600 dark:text-white" onClick={() => setDraft(t)}>{t.title}</button>
           <div className="mt-1 flex flex-wrap items-center gap-1.5">
             {t.subjects?.map((s) => <span key={s} className={`chip !py-0 ${subjectTone(s)}`}>{s}</span>)}
             {t.revision?.notes && <span className="text-xs text-slate-500">{t.revision.notes}</span>}
@@ -56,7 +59,8 @@ export default function Revisions() {
         <button className="btn !py-1.5" onClick={() => review(t.id, true)}>Revised</button>
         <button className="btn-ghost !py-1.5" onClick={() => review(t.id, false)}>Forgot</button>
         <input type="date" aria-label={`Reschedule ${t.title}`} className="input !w-auto !px-2 !py-1 !text-xs" min={today} value={t.planned ?? ""} onChange={(e) => e.target.value && update(t.id, { planned: e.target.value }, { untimed: true })} />
-        <button className="icon-btn" aria-label={`Delete ${t.title}`} onClick={() => remove("todos", t.id, "Revision")}><Trash2 size={15} /></button>
+        <button className="icon-btn hover:!text-brand-600" aria-label={`Edit ${t.title}`} title="Edit" onClick={() => setDraft(t)}><Pencil size={15} /></button>
+        <button className="icon-btn" aria-label={`Delete ${t.title}`} onClick={del.bind(null, t)}><Trash2 size={15} /></button>
       </div>
     );
   };
@@ -65,6 +69,7 @@ export default function Revisions() {
     <>
       <PageHeader title="Revision" sub="Spaced repetition: 1 → 3 → 7 → 14 → 30 → 60 days. Forgetting resets to 1 day. Every revision also appears on your Schedule on its due day.">
         <Link to="/schedule" className="btn-ghost"><CalendarDays size={15} />Open schedule</Link>
+        <button className="btn" onClick={() => setDraft({ planned: addDays(today, 1), revision: { key: "", intervalDays: 1, lastReviewed: today } })}><Plus size={15} />New revision</button>
       </PageHeader>
       <div className="card">
         <div className="grid gap-3 sm:grid-cols-7">
@@ -84,6 +89,7 @@ export default function Revisions() {
           {later.length ? later.map((t) => <Row key={t.id} t={t} />) : <Empty icon={<RotateCcw size={28} />} text={open.length ? "Nothing scheduled" : "Add a topic after you study it"} />}
         </div>
       </div>
+      {draft && <TaskDialog key={draft.id ?? "new"} draft={draft} onClose={() => setDraft(null)} onDelete={del} />}
     </>
   );
 }
