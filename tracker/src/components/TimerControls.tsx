@@ -1,10 +1,10 @@
 import { Pause, Play, Square } from "lucide-react";
 import { usePomodoro } from "../lib/pomodoro";
 
-/** Start → (End + small Pause). End logs the time and resets. */
+/** Start → (End + small Pause/Resume). End logs the time and resets. */
 export default function TimerControls() {
   const p = usePomodoro();
-  if (!p.running && p.elapsed <= 0) {
+  if (!p.started) {
     return <button className="btn" onClick={p.start}><Play size={15} />Start</button>;
   }
   return (

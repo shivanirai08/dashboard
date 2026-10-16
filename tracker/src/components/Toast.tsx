@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useState, type ReactNode } from "react";
 
-type Toast = { id: number; msg: string; undo?: () => void };
-const Ctx = createContext<(msg: string, undo?: () => void) => void>(() => {});
+type Toast = { id: number; msg: string; undo?: () => void; action?: string };
+const Ctx = createContext<(msg: string, undo?: () => void, action?: string) => void>(() => {});
 
 // eslint-disable-next-line react-refresh/only-export-components
 export const useToast = () => useContext(Ctx);
@@ -10,9 +10,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
   const dismiss = (id: number) => setToasts((t) => t.filter((x) => x.id !== id));
-  const push = useCallback((msg: string, undo?: () => void) => {
+  const push = useCallback((msg: string, undo?: () => void, action?: string) => {
     const id = Date.now() + Math.random();
-    setToasts((t) => [...t.slice(-2), { id, msg, undo }]);
+    setToasts((t) => [...t.slice(-2), { id, msg, undo, action }]);
     window.setTimeout(() => dismiss(id), 6000);
   }, []);
 
@@ -24,7 +24,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           <div key={t.id} className="pointer-events-auto flex items-center gap-4 rounded-xl bg-slate-900 px-4 py-2.5 text-sm text-white shadow-lg dark:bg-slate-100 dark:text-slate-900">
             {t.msg}
             {t.undo && (
-              <button className="cursor-pointer font-semibold text-indigo-300 hover:underline dark:text-indigo-600" onClick={() => { t.undo?.(); dismiss(t.id); }}>Undo</button>
+              <button className="cursor-pointer font-semibold text-indigo-300 hover:underline dark:text-indigo-600" onClick={() => { t.undo?.(); dismiss(t.id); }}>{t.action ?? "Undo"}</button>
             )}
           </div>
         ))}

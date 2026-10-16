@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { FolderClosed, FolderOpen, Layers, Plus, Trophy } from "lucide-react";
+import { FolderClosed, FolderOpen, Layers, Plus, Trash2, Trophy } from "lucide-react";
 import { useStore } from "../lib/store";
 import { formatDate } from "../lib/dates";
+import { useToast } from "../components/Toast";
 import { PageHeader } from "../components/ui";
 import MistakeSheet from "../components/MistakeSheet";
 import { ReasonBreakdown, SubjectMatrix } from "../components/Analysis";
@@ -12,6 +13,7 @@ type Folder = { type: "all" } | { type: "none" } | { type: "mock"; id: string } 
 
 export default function Mistakes() {
   const { state, catalog, setState } = useStore();
+  const toast = useToast();
   const [folder, setFolder] = useState<Folder>({ type: "all" });
   const [kind, setKind] = useState<MistakeKind | "">("");
   const [subject, setSubject] = useState("");
@@ -41,13 +43,35 @@ export default function Mistakes() {
     setNewSession("");
   };
 
+  // only revision sessions can be deleted — mocks live on the Mocks page
+  const deleteSession = (name: string) => {
+    const owned = state.mistakes.filter((m) => m.session === name);
+    if (owned.length && !window.confirm(`Delete session “${name}” and its ${owned.length} mistake${owned.length > 1 ? "s" : ""}?`)) return;
+    const prev = state;
+    setState((p) => ({ ...p, sessions: (p.sessions ?? []).filter((x) => x !== name), mistakes: p.mistakes.filter((m) => m.session !== name) }));
+    if (folder.type === "session" && folder.name === name) setFolder({ type: "all" });
+    toast(`Session “${name}” deleted`, () => setState((p) => ({
+      ...p,
+      sessions: [...new Set([...(p.sessions ?? []), ...(prev.sessions ?? []).filter((x) => x === name)])],
+      mistakes: [...p.mistakes, ...owned],
+    })));
+  };
+
   const same = (a: Folder, b: Folder) => JSON.stringify(a) === JSON.stringify(b);
-  const FolderBtn = ({ f, label, n, icon }: { f: Folder; label: string; n: number; icon?: boolean }) => (
-    <button onClick={() => setFolder(f)} className={`flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-sm transition ${same(folder, f) ? "bg-brand-50 font-medium text-brand-700 dark:bg-brand-500/15 dark:text-brand-50" : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-white/5"}`}>
-      {icon !== false && (same(folder, f) ? <FolderOpen size={15} /> : <FolderClosed size={15} />)}
-      <span className="min-w-0 flex-1 truncate">{label}</span>
-      <span className="text-xs text-slate-400">{n}</span>
-    </button>
+  const FolderBtn = ({ f, label, n, icon, onDelete }: { f: Folder; label: string; n: number; icon?: boolean; onDelete?: () => void }) => (
+    <div className={`group flex items-center rounded-lg transition ${same(folder, f) ? "bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-50" : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-white/5"}`}>
+      <button onClick={() => setFolder(f)} className={`flex min-w-0 flex-1 cursor-pointer items-center gap-2 px-2.5 py-1.5 text-left text-sm ${same(folder, f) ? "font-medium" : ""}`}>
+        {icon !== false && (same(folder, f) ? <FolderOpen size={15} /> : <FolderClosed size={15} />)}
+        <span className="min-w-0 flex-1 truncate">{label}</span>
+        <span className="text-xs text-slate-400">{n}</span>
+      </button>
+      {onDelete && (
+        <button onClick={onDelete} aria-label={`Delete session ${label}`} title="Delete session"
+          className="mr-1 grid size-6 shrink-0 cursor-pointer place-items-center rounded-md text-slate-400 opacity-0 transition hover:bg-rose-100 hover:text-rose-600 focus-visible:opacity-100 group-hover:opacity-100 max-lg:opacity-100 dark:hover:bg-rose-500/15">
+          <Trash2 size={13} />
+        </button>
+      )}
+    </div>
   );
 
   return (
@@ -69,7 +93,8 @@ export default function Mistakes() {
           <div>
             <div className="mb-1 flex items-center gap-1.5 px-2.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400"><Layers size={12} />Revision sessions</div>
             <div className="max-h-56 space-y-0.5 overflow-y-auto">
-              {sessions.map((s) => <FolderBtn key={s} f={{ type: "session", name: s }} label={s} n={count((x) => x.session === s)} />)}
+              {sessions.map((s) => <FolderBtn key={s} f={{ type: "session", name: s }} label={s} n={count((x) => x.session === s)} onDelete={() => deleteSession(s)} />)}
+              {!sessions.length && <div className="px-2.5 text-xs text-slate-400">No sessions yet — create one below</div>}
             </div>
             <div className="mt-2 flex gap-1.5 px-1">
               <input className="input !py-1 text-xs" placeholder="New session…" value={newSession} onChange={(e) => setNewSession(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addSession()} />

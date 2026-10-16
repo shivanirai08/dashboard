@@ -2,6 +2,7 @@ import { useState } from "react";
 import { BookmarkPlus, Plus, Trash2 } from "lucide-react";
 import { useStore } from "../lib/store";
 import { useRemove } from "../lib/undo";
+import { useTasks } from "../lib/useTasks";
 import { useToast } from "./Toast";
 import { uid } from "../lib/ids";
 import { addDays, todayISO } from "../lib/dates";
@@ -19,6 +20,7 @@ type Props = {
 export default function MistakeSheet({ rows, defaults, showSource }: Props) {
   const { state, catalog, setState } = useStore();
   const remove = useRemove();
+  const { create } = useTasks();
   const toast = useToast();
   const [focusId, setFocusId] = useState<string | null>(null);
 
@@ -39,8 +41,8 @@ export default function MistakeSheet({ rows, defaults, showSource }: Props) {
   const toRevision = (m: Mistake) => {
     const topic = m.topic || m.question.slice(0, 60);
     if (!topic) return toast("Add a topic first");
-    if (state.revisions.some((r) => r.topic === topic && r.subject === m.subject)) return toast("Already in revision");
-    setState((p) => ({ ...p, revisions: [...p.revisions, { id: uid(), subject: m.subject, topic, notes: m.fix, lastReviewed: todayISO(), nextDue: addDays(todayISO(), 1), intervalDays: 1 }] }));
+    if (state.todos.some((t) => t.revision && t.status !== "done" && t.title === topic)) return toast("Already in revision");
+    create({ title: topic, subjects: [m.subject], planned: addDays(todayISO(), 1), revision: { key: uid(), intervalDays: 1, lastReviewed: todayISO(), notes: m.fix || undefined } }, { untimed: true });
     toast(`“${topic}” added to revision`);
   };
 
@@ -49,7 +51,7 @@ export default function MistakeSheet({ rows, defaults, showSource }: Props) {
   return (
     <div>
       <div className="sheet-wrap max-h-[70vh]">
-        <table className="sheet min-w-[1280px] table-fixed">
+        <table className="sheet min-w-[1400px] table-fixed">
           <thead>
             <tr>
               <th className="w-10 text-center">#</th>
@@ -59,7 +61,7 @@ export default function MistakeSheet({ rows, defaults, showSource }: Props) {
               <th className="w-40">Topic</th>
               <th className="w-20">Marks</th>
               <th className="w-28">Result</th>
-              <th className="w-52">Why wrong</th>
+              <th className="w-72">Why wrong</th>
               <th>What went wrong</th>
               <th>Lesson / correct approach</th>
               <th className="w-10 text-center">✓</th>

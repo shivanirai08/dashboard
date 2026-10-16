@@ -8,213 +8,175 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { todayISO } from "./dates";
 import { uid } from "./ids";
+import { fromMin, nowHM, toMin } from "./schedule";
 import { useStore } from "./store";
 
-type Phase = "focus" | "break";
-export type TimerMode = "pomodoro" | "open";
-
-type PomodoroApi = {
-  mode: TimerMode;
-  setMode: (m: TimerMode) => void;
-  phase: Phase;
-  /** pomodoro: seconds left · open: seconds elapsed */
-  remaining: number;
+/**
+ * Focus stopwatch: it counts up from when you press play. Pause to stop the clock, resume to keep
+ * going, End to log what you did — against the selected task, or as "extra study" with no task.
+ */
+type FocusApi = {
   running: boolean;
-  focusMin: number;
-  breakMin: number;
+  /** seconds focused in the current run (0 = untouched) */
+  elapsed: number;
+  /** the stopwatch has time on it (running or paused) */
+  started: boolean;
   label: string;
   setLabel: (s: string) => void;
   subject: string;
   setSubject: (s: string) => void;
   taskId: string | null;
-  /** attach the running/next session to a task (its time gets logged there) */
+  /** attach the next session to a task (its time gets logged there); null = extra study, logged only in the day's session log */
+  selectTask: (id: string | null, title?: string, subject?: string) => void;
+  /** play on a task: select it and start/resume (switching from another task logs that one first) */
   focusOnTask: (id: string, title: string, subject?: string) => void;
   start: () => void;
   pause: () => void;
-  reset: () => void;
-  skip: () => void;
-  /** seconds spent in the current run (0 = untouched) */
-  elapsed: number;
   /** end the run: log what was focused (if any) and reset */
   finish: () => void;
-  setFocusMin: (n: number) => void;
-  setBreakMin: (n: number) => void;
 };
 
-const PomodoroContext = createContext<PomodoroApi | null>(null);
+const RUN_KEY = "gate-focus-run";
+type Saved = { accMs: number; resumeAt: number | null; startedAt: string | null; taskId: string | null; label: string; subject: string };
+
+function loadRun(): Saved {
+  try {
+    const raw = localStorage.getItem(RUN_KEY);
+    if (raw) return { accMs: 0, resumeAt: null, startedAt: null, taskId: null, label: "", subject: "", ...(JSON.parse(raw) as Partial<Saved>) };
+  } catch {
+    /* storage unavailable */
+  }
+  return { accMs: 0, resumeAt: null, startedAt: null, taskId: null, label: "", subject: "" };
+}
+
+const FocusContext = createContext<FocusApi | null>(null);
 
 export function PomodoroProvider({ children }: { children: ReactNode }) {
   const { setState } = useStore();
-  const [mode, setModeRaw] = useState<TimerMode>("pomodoro");
-  const [focusMin, setFocusMin] = useState(25);
-  const [breakMin, setBreakMin] = useState(5);
-  const [phase, setPhase] = useState<Phase>("focus");
-  const [remaining, setRemaining] = useState(25 * 60);
-  const [running, setRunning] = useState(false);
-  const [label, setLabel] = useState("");
-  const [taskId, setTaskId] = useState<string | null>(null);
-  const [subject, setSubject] = useState("");
-  const subjectRef = useRef(subject);
-  subjectRef.current = subject;
-  const labelRef = useRef(label);
-  labelRef.current = label;
-  const runStart = useRef<Date | null>(null); // when the current run first started
-  const taskRef = useRef(taskId);
-  taskRef.current = taskId;
+  // the run lives in a ref (so it survives re-renders and a page reload); `tick` just redraws it
+  const run = useRef<Saved>(loadRun());
+  const [, setTick] = useState(0);
+  const redraw = () => setTick((n) => n + 1);
+  const save = () => {
+    try { localStorage.setItem(RUN_KEY, JSON.stringify(run.current)); } catch { /* ignore */ }
+    redraw();
+  };
 
-  const logSession = useCallback(
-    (minutes: number) => {
-      if (minutes < 1) return;
-      const tid = taskRef.current ?? undefined;
-      const end = new Date();
-      const start = runStart.current ?? new Date(end.getTime() - minutes * 60_000);
-      runStart.current = null;
-      setState((prev) => ({
-        ...prev,
-        pomodoros: [
-          { id: uid(), startedAt: start.toISOString(), endedAt: end.toISOString(), minutes, label: labelRef.current.trim() || undefined, taskId: tid, subject: subjectRef.current || undefined, kind: "focus" },
-          ...prev.pomodoros,
-        ],
-        todos: tid ? prev.todos.map((t) => (t.id === tid ? { ...t, timeMin: (t.timeMin ?? 0) + minutes } : t)) : prev.todos,
-      }));
-    },
-    [setState],
-  );
+  const elapsedMs = () => run.current.accMs + (run.current.resumeAt ? Date.now() - run.current.resumeAt : 0);
+  const running = run.current.resumeAt !== null;
+  const elapsed = Math.floor(elapsedMs() / 1000);
 
-  // Tick from the wall clock, not from the interval count: browsers throttle
-  // timers in background tabs, which would make a naive "-1 per tick" drift.
+  // tick from the wall clock, not an interval count: background tabs throttle timers
   useEffect(() => {
     if (!running) return;
-    let last = Date.now();
-    const id = window.setInterval(() => {
-      const now = Date.now();
-      const delta = Math.max(1, Math.floor((now - last) / 1000));
-      last += delta * 1000;
-      if (mode === "open") {
-        setRemaining((s) => s + delta);
-        return;
-      }
-      setRemaining((s) => {
-        if (s > delta) return s - delta;
-        setRunning(false);
-        chime(phase === "focus" ? "Focus session done — take a break" : "Break over — back to focus");
-        if (phase === "focus") {
-          logSession(focusMin);
-          setPhase("break");
-          return breakMin * 60;
-        }
-        runStart.current = null;
-        setPhase("focus");
-        return focusMin * 60;
-      });
-    }, 1000);
+    const id = window.setInterval(redraw, 1000);
     return () => window.clearInterval(id);
-  }, [running, mode, phase, focusMin, breakMin, logSession]);
+  }, [running]);
 
   // show the timer in the browser tab title
   useEffect(() => {
     const base = "GATE CSE Tracker";
-    const started = mode === "open" ? remaining > 0 : remaining < (phase === "focus" ? focusMin : breakMin) * 60;
-    document.title = running || started ? `${running ? "▶" : "⏸"} ${formatClock(remaining)} · ${base}` : base;
-  }, [running, remaining, mode, phase, focusMin, breakMin]);
+    document.title = elapsed > 0 ? `${running ? "▶" : "⏸"} ${formatClock(elapsed)} · ${base}` : base;
+  }, [running, elapsed]);
 
-  const setMode = useCallback(
-    (m: TimerMode) => {
-      setRunning(false);
-      runStart.current = null;
-      setModeRaw(m);
-      setPhase("focus");
-      setRemaining(m === "open" ? 0 : focusMin * 60);
-    },
-    [focusMin],
-  );
+  /** starting work on a task moves it to in progress (and onto today if it was later / unscheduled) */
+  const markStarted = useCallback((id: string) => {
+    const today = todayISO();
+    setState((prev) => ({
+      ...prev,
+      todos: prev.todos.map((t) => {
+        if (t.id !== id || t.status !== "todo") return t;
+        if (t.planned && t.planned <= today) return { ...t, status: "doing" };
+        const start = nowHM();
+        return { ...t, status: "doing", planned: today, start, end: fromMin(toMin(start) + 60) };
+      }),
+    }));
+  }, [setState]);
 
-  const focusOnTask = useCallback((id: string, title: string, subj?: string) => {
-    setTaskId(id);
-    setLabel(title);
-    if (subj) setSubject(subj);
-    setState((prev) => ({ ...prev, todos: prev.todos.map((t) => (t.id === id && t.status === "todo" ? { ...t, status: "doing" } : t)) }));
-    runStart.current ??= new Date();
-    setRunning(true);
+  const logSession = useCallback((minutes: number) => {
+    const r = run.current;
+    if (minutes < 1) return;
+    const end = new Date();
+    const startedAt = r.startedAt ?? new Date(end.getTime() - minutes * 60_000).toISOString();
+    const tid = r.taskId ?? undefined;
+    setState((prev) => ({
+      ...prev,
+      pomodoros: [
+        { id: uid(), startedAt, endedAt: end.toISOString(), minutes, label: r.label.trim() || undefined, taskId: tid, subject: r.subject || undefined, kind: "focus" },
+        ...prev.pomodoros,
+      ],
+      todos: tid ? prev.todos.map((t) => (t.id === tid ? { ...t, timeMin: (t.timeMin ?? 0) + minutes } : t)) : prev.todos,
+    }));
   }, [setState]);
 
   const start = useCallback(() => {
-    askNotificationPermission();
-    runStart.current ??= new Date();
-    setRunning(true);
-  }, []);
-  const pause = useCallback(() => setRunning(false), []);
-  const reset = useCallback(() => {
-    setRunning(false);
-    runStart.current = null;
-    setRemaining(mode === "open" ? 0 : (phase === "focus" ? focusMin : breakMin) * 60);
-  }, [mode, phase, focusMin, breakMin]);
+    const r = run.current;
+    if (r.resumeAt) return;
+    r.resumeAt = Date.now();
+    r.startedAt ??= new Date().toISOString();
+    if (r.taskId) markStarted(r.taskId);
+    save();
+  }, [markStarted]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const skip = useCallback(() => {
-    setRunning(false);
-    runStart.current = null;
-    if (phase === "focus") {
-      setPhase("break");
-      setRemaining(breakMin * 60);
-    } else {
-      setPhase("focus");
-      setRemaining(focusMin * 60);
-    }
-  }, [phase, focusMin, breakMin]);
-
-  const elapsed = mode === "open" ? remaining : (phase === "focus" ? focusMin : breakMin) * 60 - remaining;
+  const pause = useCallback(() => {
+    const r = run.current;
+    if (!r.resumeAt) return;
+    r.accMs += Date.now() - r.resumeAt;
+    r.resumeAt = null;
+    save();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const finish = useCallback(() => {
-    setRunning(false);
-    if (phase === "focus") logSession(Math.round(elapsed / 60));
-    runStart.current = null;
-    setPhase("focus");
-    setRemaining(mode === "open" ? 0 : focusMin * 60);
-  }, [phase, elapsed, mode, focusMin, logSession]);
+    const r = run.current;
+    logSession(Math.round(elapsedMs() / 60_000));
+    run.current = { accMs: 0, resumeAt: null, startedAt: null, taskId: r.taskId, label: r.label, subject: r.subject };
+    save();
+  }, [logSession]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const value = useMemo<PomodoroApi>(
+  const selectTask = useCallback((id: string | null, title?: string, subj?: string) => {
+    const r = run.current;
+    r.taskId = id;
+    r.label = id ? (title ?? "") : "";
+    if (id && subj) r.subject = subj;
+    save();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const focusOnTask = useCallback((id: string, title: string, subj?: string) => {
+    // switching tasks mid-run: bank the time on the previous one first
+    if (run.current.taskId !== id && elapsedMs() > 0) finish();
+    selectTask(id, title, subj);
+    start();
+  }, [finish, selectTask, start]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const r = run.current;
+  const value = useMemo<FocusApi>(
     () => ({
-      mode,
-      setMode,
-      phase,
-      remaining,
       running,
-      focusMin,
-      breakMin,
-      label,
-      setLabel: (s) => {
-        setLabel(s);
-        setTaskId(null);
-      },
-      subject,
-      setSubject,
-      taskId,
+      elapsed,
+      started: elapsed > 0,
+      label: r.label,
+      setLabel: (s) => { run.current.label = s; run.current.taskId = null; save(); },
+      subject: r.subject,
+      setSubject: (s) => { run.current.subject = s; save(); },
+      taskId: r.taskId,
+      selectTask,
       focusOnTask,
       start,
       pause,
-      reset,
-      skip,
-      elapsed,
       finish,
-      setFocusMin: (n) => {
-        setFocusMin(n);
-        if (!running && mode === "pomodoro" && phase === "focus") setRemaining(n * 60);
-      },
-      setBreakMin: (n) => {
-        setBreakMin(n);
-        if (!running && mode === "pomodoro" && phase === "break") setRemaining(n * 60);
-      },
     }),
-    [mode, setMode, phase, remaining, running, focusMin, breakMin, label, subject, taskId, focusOnTask, start, pause, reset, skip, elapsed, finish],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [running, elapsed, r.label, r.subject, r.taskId, selectTask, focusOnTask, start, pause, finish],
   );
 
-  return <PomodoroContext.Provider value={value}>{children}</PomodoroContext.Provider>;
+  return <FocusContext.Provider value={value}>{children}</FocusContext.Provider>;
 }
 
 // eslint-disable-next-line react-refresh/only-export-components
-export function usePomodoro(): PomodoroApi {
-  const ctx = useContext(PomodoroContext);
+export function usePomodoro(): FocusApi {
+  const ctx = useContext(FocusContext);
   if (!ctx) throw new Error("usePomodoro must be used inside PomodoroProvider");
   return ctx;
 }
@@ -226,28 +188,4 @@ export function formatClock(seconds: number): string {
   const s = seconds % 60;
   const mm = `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
   return h ? `${h}:${mm}` : mm;
-}
-
-function chime(message: string) {
-  try {
-    const ctx = new AudioContext();
-    [660, 880].forEach((f, i) => {
-      const o = ctx.createOscillator();
-      const g = ctx.createGain();
-      o.frequency.value = f;
-      o.connect(g).connect(ctx.destination);
-      g.gain.setValueAtTime(0.15, ctx.currentTime + i * 0.25);
-      g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.25 + 0.4);
-      o.start(ctx.currentTime + i * 0.25);
-      o.stop(ctx.currentTime + i * 0.25 + 0.4);
-    });
-  } catch {
-    /* audio unavailable */
-  }
-  if ("Notification" in window && Notification.permission === "granted") new Notification(message);
-}
-
-/** Ask once (on first Start) so the end-of-session notification can show. */
-export function askNotificationPermission() {
-  if ("Notification" in window && Notification.permission === "default") void Notification.requestPermission();
 }

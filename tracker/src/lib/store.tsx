@@ -22,9 +22,38 @@ const empty: AppState = { mocks: [], mistakes: [], revisions: [], todos: [], pom
 function normalize(raw: AppState): AppState {
   const todos = (raw.todos ?? []).map((t) => {
     const legacy = t as typeof t & { done?: boolean };
-    return { ...t, status: t.status ?? (legacy.done ? "done" : "todo") } as AppState["todos"][number];
+    const { subject, ...rest } = t;
+    return { ...rest, subjects: t.subjects ?? (subject ? [subject] : undefined), status: t.status ?? (legacy.done ? "done" : "todo") } as AppState["todos"][number];
   });
-  return { ...empty, ...raw, todos };
+  return { ...empty, ...raw, todos: migrateRevisions(raw.revisions, migrateBlocks(raw.schedule, todos)), revisions: [], schedule: undefined };
+}
+
+// revision topics are tasks too: one due day each, repeated on a growing interval
+function migrateRevisions(revs: AppState["revisions"] | undefined, todos: AppState["todos"]): AppState["todos"] {
+  if (!revs?.length) return todos;
+  return [
+    ...todos,
+    ...revs.map((r) => ({
+      id: r.id, title: r.topic, subjects: r.subject ? [r.subject] : undefined, status: "todo" as const, planned: r.nextDue, createdAt: r.lastReviewed,
+      revision: { key: r.id, intervalDays: r.intervalDays, lastReviewed: r.lastReviewed, notes: r.notes || undefined },
+    })),
+  ];
+}
+
+// the planner and the todo list used to be two lists; a time block is now just a task with a time
+function migrateBlocks(blocks: AppState["schedule"], todos: AppState["todos"]): AppState["todos"] {
+  if (!blocks?.length) return todos;
+  const out = todos.map((t) => ({ ...t }));
+  const byId = new Map(out.map((t) => [t.id, t]));
+  for (const b of [...blocks].sort((a, c) => (a.date + a.start).localeCompare(c.date + c.start))) {
+    const t = b.todoId ? byId.get(b.todoId) : undefined;
+    if (t && !t.start) {
+      Object.assign(t, { planned: b.date, start: b.start, end: b.end });
+    } else {
+      out.push({ id: b.id, title: b.title, subjects: b.subject ? [b.subject] : undefined, status: b.done ? "done" : "todo", planned: b.date, start: b.start, end: b.end, createdAt: b.date, doneAt: b.done ? b.date : undefined });
+    }
+  }
+  return out;
 }
 
 function load(): AppState {

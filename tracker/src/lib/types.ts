@@ -23,7 +23,7 @@ export type MockAttempt = {
   notes: string;
 };
 
-export type MistakeKind = "concept" | "forgot" | "silly" | "calculation" | "misread" | "guess" | "time";
+export type MistakeKind = "concept" | "implement" | "forgot" | "silly" | "calculation" | "misread" | "guess" | "time";
 
 export type Mistake = {
   id: string;
@@ -43,6 +43,7 @@ export type Mistake = {
   result?: "wrong" | "skipped";
 };
 
+/** @deprecated standalone revision topics; migrated into tasks (`TodoItem.revision`) on load */
 export type Revision = {
   id: string;
   topic: string;
@@ -61,7 +62,24 @@ export type TodoItem = {
   title: string;
   status: TodoStatus;
   priority?: Priority;
+  /** a task can cover several subjects */
+  subjects?: string[];
+  /** @deprecated single subject from older saves; migrated to `subjects` on load */
   subject?: string;
+  /** set on spaced-repetition tasks: each "revised" closes this task and schedules the next one further out */
+  revision?: {
+    /** same for every repeat of one topic */
+    key: string;
+    intervalDays: number;
+    lastReviewed: string;
+    notes?: string;
+  };
+  /** the day it is scheduled on; no date = "keep in todo". In progress from this day until it is done */
+  planned?: string;
+  /** time of day on `planned`, "HH:MM" 24h; end is start + duration */
+  start?: string;
+  end?: string;
+  /** deadline; after this an unfinished task is overdue */
   due?: string;
   /** deadline pushed back this many times */
   extensions?: number;
@@ -83,12 +101,29 @@ export type PomodoroSession = {
   subject?: string;
 };
 
+/** Old standalone planner blocks; migrated into tasks on load (see store.tsx). */
+export type LegacyBlock = {
+  id: string;
+  date: string;
+  /** "HH:MM", 24h */
+  start: string;
+  end: string;
+  title: string;
+  subject?: string;
+  /** optional link to a todo; completing the block completes the task */
+  todoId?: string;
+  done: boolean;
+};
+
 export type AppState = {
   mocks: MockAttempt[];
   mistakes: Mistake[];
+  /** @deprecated always empty; revisions are tasks now */
   revisions: Revision[];
   todos: TodoItem[];
   pomodoros: PomodoroSession[];
+  /** @deprecated migrated into `todos` */
+  schedule?: LegacyBlock[];
   examDate?: string;
   /** named revision sessions, so empty folders persist */
   sessions?: string[];

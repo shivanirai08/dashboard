@@ -1,12 +1,12 @@
 import { useEffect } from "react";
-import { NavLink, Route, Routes, useLocation, useNavigate } from "react-router-dom";
-import { LayoutDashboard, LineChart, Moon, RotateCcw, Settings, Sun, Timer, TriangleAlert } from "lucide-react";
+import { Navigate, NavLink, Route, Routes, useNavigate } from "react-router-dom";
+import { CalendarDays, LayoutDashboard, LineChart, Moon, RotateCcw, Settings, Sun, TriangleAlert } from "lucide-react";
 import Dashboard from "./pages/Dashboard";
 import Mocks from "./pages/Mocks";
 import MockDetail from "./pages/MockDetail";
 import Mistakes from "./pages/Mistakes";
 import Revisions from "./pages/Revisions";
-import Focus from "./pages/Focus";
+import Schedule from "./pages/Schedule";
 import DataPage from "./pages/DataPage";
 import { useStore } from "./lib/store";
 import { formatClock, usePomodoro } from "./lib/pomodoro";
@@ -14,10 +14,10 @@ import { useTheme } from "./lib/theme";
 
 const links = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/schedule", label: "Schedule & Tasks", icon: CalendarDays },
   { to: "/mocks", label: "Mock Analysis", icon: LineChart },
   { to: "/mistakes", label: "Mistake Log", icon: TriangleAlert },
   { to: "/revision", label: "Revision", icon: RotateCcw },
-  { to: "/focus", label: "Todo & Focus", icon: Timer },
   { to: "/data", label: "Settings & Sync", icon: Settings },
 ];
 
@@ -26,17 +26,15 @@ export default function App() {
   const { theme, toggle } = useTheme();
   const pomo = usePomodoro();
   const nav = useNavigate();
-  const { pathname } = useLocation();
 
-  // N = quick add · Space = start/pause timer (ignored while typing)
+  // N = new task · Space = start/pause timer (ignored while typing)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement;
       if (/^(INPUT|TEXTAREA|SELECT|BUTTON)$/.test(el.tagName) || el.isContentEditable || e.metaKey || e.ctrlKey || e.altKey) return;
       if (e.key === "n" || e.key === "N") {
         e.preventDefault();
-        if (pathname !== "/") nav("/");
-        window.setTimeout(() => document.getElementById("quick-add-input")?.focus(), 60);
+        nav("/schedule?new=1");
       } else if (e.key === " ") {
         e.preventDefault();
         if (pomo.running) pomo.pause();
@@ -45,7 +43,7 @@ export default function App() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [pathname, nav, pomo]);
+  }, [nav, pomo]);
 
   return (
     <div className="min-h-screen lg:flex">
@@ -68,13 +66,13 @@ export default function App() {
 
         <div className="mt-auto space-y-3">
           <div className="px-2 text-[11px] leading-5 text-slate-400">
-            <kbd className="rounded border border-slate-300 px-1 dark:border-white/20">N</kbd> quick add ·{" "}
+            <kbd className="rounded border border-slate-300 px-1 dark:border-white/20">N</kbd> new task ·{" "}
             <kbd className="rounded border border-slate-300 px-1 dark:border-white/20">Space</kbd> start/pause
           </div>
-          {pomo.running && (
-            <NavLink to="/focus" className="block rounded-xl bg-brand-50 px-3 py-2 text-center dark:bg-brand-500/15">
-              <div className="text-[11px] uppercase text-brand-600">{pomo.mode === "open" ? "open timer" : pomo.phase} running</div>
-              <div className="font-mono text-xl font-semibold text-brand-700 dark:text-brand-50">{formatClock(pomo.remaining)}</div>
+          {pomo.started && (
+            <NavLink to="/" className="block rounded-xl bg-brand-50 px-3 py-2 text-center dark:bg-brand-500/15">
+              <div className="text-[11px] uppercase text-brand-600">{pomo.running ? "focus running" : "focus paused"}</div>
+              <div className="font-mono text-xl font-semibold text-brand-700 dark:text-brand-50">{formatClock(pomo.elapsed)}</div>
             </NavLink>
           )}
           <div className="flex items-center justify-between px-2 text-xs text-slate-500">
@@ -91,11 +89,12 @@ export default function App() {
         <div className="mx-auto max-w-[1560px]">
           <Routes>
             <Route path="/" element={<Dashboard />} />
+            <Route path="/schedule" element={<Schedule />} />
             <Route path="/mocks" element={<Mocks />} />
             <Route path="/mocks/:id" element={<MockDetail />} />
             <Route path="/mistakes" element={<Mistakes />} />
             <Route path="/revision" element={<Revisions />} />
-            <Route path="/focus" element={<Focus />} />
+            <Route path="/focus" element={<Navigate to="/schedule" replace />} />
             <Route path="/data" element={<DataPage />} />
           </Routes>
         </div>
