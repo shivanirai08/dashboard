@@ -1,3 +1,4 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
 @import "tailwindcss";
 @custom-variant dark (&:where(.dark, .dark *));
 
@@ -20,6 +21,12 @@ body {
   @apply bg-[#f4f5fa] text-slate-700 antialiased dark:bg-[#080b12] dark:text-slate-300;
   background-image: radial-gradient(900px 380px at 70% -120px, rgba(99, 102, 241, 0.13), transparent 70%);
   background-repeat: no-repeat;
+}
+button, a, summary, [role="button"], select, input[type="checkbox"] { -webkit-tap-highlight-color: transparent; }
+:focus-visible { outline: 2px solid var(--color-brand-500); outline-offset: 2px; border-radius: 6px; }
+input:focus-visible, select:focus-visible, textarea:focus-visible { outline: none; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
 }
 ::selection { background: rgba(99, 102, 241, 0.28); }
 ::-webkit-scrollbar { width: 10px; height: 10px; }

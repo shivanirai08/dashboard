@@ -57,7 +57,7 @@ export default function App() {
             <div className="text-xs text-slate-500">{catalog.exam} · {catalog.target}</div>
           </div>
         </div>
-        <nav className="space-y-1">
+        <nav aria-label="Main" className="space-y-1">
           {links.map(({ to, label, icon: Icon }) => (
             <NavLink key={to} to={to} end={to === "/"}
               className={({ isActive }) => `flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${isActive ? "bg-brand-50 text-brand-700 shadow-[inset_3px_0_0_var(--color-brand-500)] dark:bg-brand-500/15 dark:text-brand-50" : "text-slate-500 hover:bg-slate-100 dark:hover:bg-white/5"}`}>
@@ -101,11 +101,11 @@ export default function App() {
         </div>
       </main>
 
-      <nav className="fixed inset-x-0 bottom-0 z-10 flex border-t border-slate-200 bg-white/90 backdrop-blur lg:hidden dark:border-white/10 dark:bg-[#0e111c]/90">
+      <nav aria-label="Main mobile" className="fixed inset-x-0 bottom-0 z-10 flex border-t border-slate-200 bg-white/90 backdrop-blur lg:hidden dark:border-white/10 dark:bg-[#0e111c]/90">
         {links.map(({ to, label, icon: Icon }) => (
           <NavLink key={to} to={to} end={to === "/"} aria-label={label}
-            className={({ isActive }) => `flex flex-1 justify-center py-3 ${isActive ? "text-brand-600" : "text-slate-400"}`}>
-            <Icon size={20} />
+            className={({ isActive }) => `flex min-h-14 flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-medium transition-colors ${isActive ? "text-brand-600" : "text-slate-500"}`}>
+            <Icon size={20} />{label.split(" ")[0]}
           </NavLink>
         ))}
       </nav>

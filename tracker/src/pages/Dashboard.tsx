@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { CalendarRange, CheckCircle2, Flame, Target } from "lucide-react";
+import { CalendarRange, CheckCircle2, Clock, Flame, ListTodo, RotateCcw, Target, TriangleAlert, Trophy } from "lucide-react";
 import { useStore } from "../lib/store";
 import { formatClock, usePomodoro } from "../lib/pomodoro";
 import TimerControls from "../components/TimerControls";
@@ -67,10 +67,10 @@ export default function Dashboard() {
     }));
 
   const tiles = [
-    { label: "Focus today", value: `${todayMin}m`, to: "/focus", tone: "from-indigo-500 to-violet-500" },
-    { label: "Revisions due", value: dueRev.length, to: "/revision", tone: "from-amber-500 to-orange-500" },
-    { label: "Open mistakes", value: openMistakes, to: "/mistakes", tone: "from-rose-500 to-pink-500" },
-    { label: "Mocks taken", value: state.mocks.length, to: "/mocks", tone: "from-emerald-500 to-teal-500" },
+    { label: "Focus today", value: `${todayMin}m`, to: "/focus", tone: "from-indigo-500 to-violet-500", icon: Clock },
+    { label: "Revisions due", value: dueRev.length, to: "/revision", tone: "from-amber-500 to-orange-500", icon: RotateCcw },
+    { label: "Open mistakes", value: openMistakes, to: "/mistakes", tone: "from-rose-500 to-pink-500", icon: TriangleAlert },
+    { label: "Mocks taken", value: state.mocks.length, to: "/mocks", tone: "from-emerald-500 to-teal-500", icon: Trophy },
   ];
 
   const topReasons = REASON_KEYS.map((k) => ({ k, n: state.mistakes.filter((m) => m.kind === k).length })).filter((x) => x.n).sort((x, y) => y.n - x.n);
@@ -78,21 +78,22 @@ export default function Dashboard() {
 
   return (
     <>
-      <PageHeader title={`Good ${hour < 12 ? "morning" : hour < 18 ? "afternoon" : "evening"} 👋`} sub={left !== null ? `${left} days to ${catalog.target}` : `Preparing for ${catalog.target} · set your exam date in Settings`} />
+      <PageHeader title={`Good ${hour < 12 ? "morning" : hour < 18 ? "afternoon" : "evening"}`} sub={left !== null ? `${left} days to ${catalog.target}` : `Preparing for ${catalog.target} · set your exam date in Settings`} />
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
-        <div className="min-w-0 space-y-5">
+      <div className="space-y-5">
+        <div className="grid items-stretch gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
+          <div className="flex min-w-0 flex-col gap-5">
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             {tiles.map((t) => (
-              <Link key={t.label} to={t.to} className="card group relative overflow-hidden !p-4 transition hover:-translate-y-0.5 hover:shadow-md">
+              <Link key={t.label} to={t.to} className="card group relative overflow-hidden !p-4 transition hover:-translate-y-0.5 hover:shadow-md focus-visible:ring-4 focus-visible:ring-brand-500/30">
                 <div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${t.tone}`} />
-                <div className="text-xs font-medium text-slate-500">{t.label}</div>
+                <div className="flex items-center justify-between"><span className="text-xs font-medium text-slate-500">{t.label}</span><t.icon size={16} className="text-slate-300 transition-colors group-hover:text-brand-500 dark:text-slate-600" aria-hidden /></div>
                 <div className="mt-1 text-3xl font-bold tabular-nums text-slate-900 dark:text-white">{t.value}</div>
               </Link>
             ))}
           </div>
 
-          <div className="grid gap-5 lg:grid-cols-3">
+          <div className="grid flex-1 gap-5 lg:grid-cols-3">
             <div className="card lg:col-span-2">
               <div className="mb-3 flex items-center justify-between">
                 <div className="card-title !mb-0">Focus minutes · last 14 days</div>
@@ -120,7 +121,14 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div className="grid gap-5 lg:grid-cols-3">
+          </div>
+          <div className="space-y-5">
+            <FocusNow />
+            <QuickAdd />
+          </div>
+        </div>
+
+        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
             <div className="card">
               <div className="card-title flex items-center gap-2"><CalendarRange size={15} /> This week</div>
               <dl className="grid grid-cols-2 gap-4 text-sm">
@@ -153,22 +161,19 @@ export default function Dashboard() {
               ) : <Empty icon={<Target />} text="Log mistakes to see patterns" />}
             </div>
           </div>
-        </div>
 
-        <div className="space-y-5">
-          <FocusNow />
-          <QuickAdd />
+        <div className="grid items-start gap-5 lg:grid-cols-2">
           <div className="card">
-            <div className="card-title flex items-center justify-between">Revise today <span className="text-xs font-normal text-slate-400">{dueRev.length} due</span></div>
-            {dueRev.length ? dueRev.slice(0, 6).map((r) => (
-              <div key={r.id} className="flex items-center gap-2 border-b border-slate-100 py-2 text-sm last:border-0 dark:border-white/5"><span className="min-w-0 flex-1 truncate">{r.topic}<span className="ml-2 text-xs text-slate-500">{r.subject}</span></span><button className="chip cursor-pointer bg-emerald-100 text-emerald-700 hover:brightness-95 dark:bg-emerald-500/15 dark:text-emerald-300" onClick={() => markRevised(r.id)}>Done</button></div>
-            )) : <Empty icon={<CheckCircle2 />} text="Nothing due 🎉" />}
+            <div className="card-title flex items-center justify-between"><span className="flex items-center gap-2"><RotateCcw size={15} aria-hidden /> Revise today</span> <span className="text-xs font-normal text-slate-400">{dueRev.length} due</span></div>
+            {dueRev.length ? dueRev.slice(0, 8).map((r) => (
+              <div key={r.id} className="flex items-center gap-2 border-b border-slate-100 py-2.5 text-sm last:border-0 dark:border-white/5"><span className="min-w-0 flex-1 truncate">{r.topic}<span className="ml-2 text-xs text-slate-500">{r.subject}</span></span><button className="chip min-h-8 cursor-pointer bg-emerald-100 px-3 text-emerald-700 transition hover:brightness-95 focus-visible:ring-2 focus-visible:ring-emerald-500 dark:bg-emerald-500/15 dark:text-emerald-300" aria-label={`Mark ${r.topic} revised`} onClick={() => markRevised(r.id)}>Done</button></div>
+            )) : <Empty icon={<CheckCircle2 />} text="Nothing due today" />}
           </div>
           <div className="card">
-            <div className="card-title flex items-center justify-between">Pending tasks <Link to="/focus" className="text-xs font-normal text-brand-600">board →</Link></div>
-            {todos.length ? todos.slice(0, 7).map((t) => (
-              <label key={t.id} className="flex cursor-pointer items-center gap-3 border-b border-slate-100 py-2 text-sm last:border-0 dark:border-white/5">
-                <input type="checkbox" className="size-4 accent-indigo-600" onChange={() => setState((s) => ({ ...s, todos: s.todos.map((x) => (x.id === t.id ? { ...x, status: "done" as const, doneAt: today } : x)) }))} />
+            <div className="card-title flex items-center justify-between"><span className="flex items-center gap-2"><ListTodo size={15} aria-hidden /> Pending tasks</span> <Link to="/focus" className="text-xs font-normal text-brand-600">board →</Link></div>
+            {todos.length ? todos.slice(0, 8).map((t) => (
+              <label key={t.id} className="flex cursor-pointer items-center gap-3 border-b border-slate-100 py-2.5 text-sm last:border-0 dark:border-white/5">
+                <input type="checkbox" aria-label={`Complete ${t.title}`} className="size-4 cursor-pointer accent-indigo-600" onChange={() => setState((s) => ({ ...s, todos: s.todos.map((x) => (x.id === t.id ? { ...x, status: "done" as const, doneAt: today } : x)) }))} />
                 <span className="min-w-0 flex-1 truncate">{t.title}</span>{t.due && <span className={`text-xs ${t.due < today ? "text-rose-500" : "text-slate-400"}`}>{formatDate(t.due)}</span>}
               </label>
             )) : <Empty icon={<CheckCircle2 />} text="No pending tasks" />}
@@ -194,12 +199,12 @@ function FocusNow() {
       </div>
       <div className="mt-3 inline-flex rounded-lg border border-slate-200 p-0.5 text-xs dark:border-white/10">
         {([["pomodoro", "Pomodoro"], ["open", "Open"]] as const).map(([m, l]) => (
-          <button key={m} onClick={() => p.setMode(m)} className={`cursor-pointer rounded-md px-3 py-0.5 ${p.mode === m ? "bg-brand-500 text-white" : "text-slate-500"}`}>{l}</button>
+          <button key={m} onClick={() => p.setMode(m)} aria-pressed={p.mode === m} className={`cursor-pointer rounded-md px-3 py-1 transition-colors ${p.mode === m ? "bg-brand-500 text-white" : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"}`}>{l}</button>
         ))}
       </div>
       <div className="mt-3 flex gap-2">
-        <input className="input min-w-0 flex-1" placeholder="Working on…" value={p.label} onChange={(e) => p.setLabel(e.target.value)} />
-        <select className="input !w-36" value={p.subject} onChange={(e) => p.setSubject(e.target.value)}>
+        <input aria-label="What are you working on" className="input min-w-0 flex-1" placeholder="Working on…" value={p.label} onChange={(e) => p.setLabel(e.target.value)} />
+        <select aria-label="Subject" className="input !w-36" value={p.subject} onChange={(e) => p.setSubject(e.target.value)}>
           <option value="">Subject</option>{catalog.subjects.map((x) => <option key={x}>{x}</option>)}
         </select>
       </div>
@@ -244,18 +249,18 @@ function QuickAdd() {
       <div className="mb-3 flex flex-wrap items-center gap-1">
         <div className="card-title !mb-0 mr-1">Add</div>
         {tabs.map(([k, l]) => (
-          <button key={k} onClick={() => setTab(k)} className={`cursor-pointer rounded-lg px-2.5 py-1 text-sm ${tab === k ? "bg-brand-500 text-white" : "text-slate-500 hover:bg-slate-100 dark:hover:bg-white/5"}`}>{l}</button>
+          <button key={k} onClick={() => setTab(k)} aria-pressed={tab === k} className={`cursor-pointer rounded-lg px-2.5 py-1.5 text-sm transition-colors ${tab === k ? "bg-brand-500 text-white" : "text-slate-500 hover:bg-slate-100 dark:hover:bg-white/5"}`}>{l}</button>
         ))}
       </div>
       <div className="flex flex-wrap gap-2">
         {(tab === "mistake" || tab === "revision") && (
-          <select className="input !w-auto" value={subject} onChange={(e) => setSubject(e.target.value)}>{catalog.subjects.map((x) => <option key={x}>{x}</option>)}</select>
+          <select aria-label="Subject" className="input !w-auto" value={subject} onChange={(e) => setSubject(e.target.value)}>{catalog.subjects.map((x) => <option key={x}>{x}</option>)}</select>
         )}
-        <input id="quick-add-input" className="input min-w-0 flex-1" placeholder={ph} value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submit()} />
+        <input id="quick-add-input" aria-label={ph} className="input min-w-0 flex-1" placeholder={ph} value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submit()} />
         {tab === "mock" && (
           <>
-            <input className="input !w-20" type="number" placeholder="Score" value={score} onChange={(e) => setScore(e.target.value)} />
-            <input className="input !w-20" type="number" placeholder="Max" value={max} onChange={(e) => setMax(e.target.value)} />
+            <input aria-label="Score" className="input !w-20" type="number" placeholder="Score" value={score} onChange={(e) => setScore(e.target.value)} />
+            <input aria-label="Max score" className="input !w-20" type="number" placeholder="Max" value={max} onChange={(e) => setMax(e.target.value)} />
           </>
         )}
         <button className="btn" onClick={submit}>Add</button>
