@@ -1,108 +1,107 @@
 import { useState } from "react";
-import { BookmarkPlus, Check, Pencil, Trash2, TriangleAlert, Undo2 } from "lucide-react";
+import { FolderClosed, FolderOpen, Layers, Plus, Trophy } from "lucide-react";
 import { useStore } from "../lib/store";
-import { uid } from "../lib/ids";
-import { addDays, formatDate, todayISO } from "../lib/dates";
-import { Empty, Field, PageHeader } from "../components/ui";
-import { useToast } from "../components/Toast";
-import { useRemove } from "../lib/undo";
+import { formatDate } from "../lib/dates";
+import { PageHeader } from "../components/ui";
+import MistakeSheet from "../components/MistakeSheet";
+import { ReasonBreakdown, SubjectMatrix } from "../components/Analysis";
+import { REASONS, REASON_KEYS } from "../lib/reasons";
 import type { Mistake, MistakeKind } from "../lib/types";
 
-const kinds: Record<MistakeKind, string> = {
-  concept: "bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300",
-  calculation: "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300",
-  misread: "bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300",
-  guess: "bg-pink-100 text-pink-700 dark:bg-pink-500/15 dark:text-pink-300",
-  time: "bg-slate-200 text-slate-700 dark:bg-white/10 dark:text-slate-300",
-};
+type Folder = { type: "all" } | { type: "none" } | { type: "mock"; id: string } | { type: "session"; name: string };
 
 export default function Mistakes() {
   const { state, catalog, setState } = useStore();
-  const toast = useToast();
-  const remove = useRemove();
-  const blank = { subject: catalog.subjects[0], topic: "", kind: "concept" as MistakeKind, question: "", fix: "" };
-  const [f, setF] = useState(blank);
-  const [editId, setEditId] = useState<string | null>(null);
-  const [filter, setFilter] = useState<"open" | "resolved" | "all">("open");
+  const [folder, setFolder] = useState<Folder>({ type: "all" });
   const [kind, setKind] = useState<MistakeKind | "">("");
   const [subject, setSubject] = useState("");
+  const [status, setStatus] = useState<"all" | "open" | "resolved">("all");
+  const [newSession, setNewSession] = useState("");
 
-  const save = () => {
-    if (!f.question.trim()) return;
-    if (editId) setState((p) => ({ ...p, mistakes: p.mistakes.map((m) => (m.id === editId ? { ...m, ...f } : m)) }));
-    else {
-      const m: Mistake = { id: uid(), date: todayISO(), ...f, resolved: false };
-      setState((p) => ({ ...p, mistakes: [m, ...p.mistakes] }));
-    }
-    setEditId(null);
-    setF({ ...blank, subject: f.subject });
-  };
-  const edit = (m: Mistake) => {
-    setEditId(m.id);
-    setF({ subject: m.subject, topic: m.topic, kind: m.kind, question: m.question, fix: m.fix });
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-  const patch = (id: string, c: Partial<Mistake>) => setState((p) => ({ ...p, mistakes: p.mistakes.map((m) => (m.id === id ? { ...m, ...c } : m)) }));
+  const sessions = [...new Set([...(state.sessions ?? []), ...state.mistakes.map((m) => m.session).filter((s): s is string => !!s)])];
+  const inFolder = (m: Mistake) =>
+    folder.type === "all" ? true
+    : folder.type === "none" ? !m.mockId && !m.session
+    : folder.type === "mock" ? m.mockId === folder.id
+    : m.session === folder.name;
 
-  const toRevision = (m: Mistake) => {
-    const topic = m.topic || m.question.slice(0, 60);
-    if (state.revisions.some((r) => r.topic === topic && r.subject === m.subject)) return toast("Already in revision");
-    setState((p) => ({ ...p, revisions: [...p.revisions, { id: uid(), subject: m.subject, topic, notes: m.fix, lastReviewed: todayISO(), nextDue: addDays(todayISO(), 1), intervalDays: 1 }] }));
-    toast(`“${topic}” added to revision`);
+  const scoped = state.mistakes.filter(inFolder);
+  const rows = scoped.filter((m) => (!kind || m.kind === kind) && (!subject || m.subject === subject) && (status === "all" || (status === "open") === !m.resolved));
+  const count = (f: (m: Mistake) => boolean) => state.mistakes.filter(f).length;
+  const mocks = [...state.mocks].sort((a, b) => b.date.localeCompare(a.date));
+
+  const defaults: Partial<Mistake> = folder.type === "mock" ? { mockId: folder.id } : folder.type === "session" ? { session: folder.name } : {};
+  const title = folder.type === "all" ? "All mistakes" : folder.type === "none" ? "Unsorted" : folder.type === "mock" ? state.mocks.find((m) => m.id === folder.id)?.name ?? "Mock" : folder.name;
+
+  const addSession = () => {
+    const n = newSession.trim();
+    if (!n) return;
+    setState((p) => ({ ...p, sessions: [...new Set([...(p.sessions ?? []), n])] }));
+    setFolder({ type: "session", name: n });
+    setNewSession("");
   };
 
-  const list = state.mistakes.filter((m) => (filter === "all" || (filter === "open") === !m.resolved) && (!kind || m.kind === kind) && (!subject || m.subject === subject));
+  const same = (a: Folder, b: Folder) => JSON.stringify(a) === JSON.stringify(b);
+  const FolderBtn = ({ f, label, n, icon }: { f: Folder; label: string; n: number; icon?: boolean }) => (
+    <button onClick={() => setFolder(f)} className={`flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-sm transition ${same(folder, f) ? "bg-brand-50 font-medium text-brand-700 dark:bg-brand-500/15 dark:text-brand-50" : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-white/5"}`}>
+      {icon !== false && (same(folder, f) ? <FolderOpen size={15} /> : <FolderClosed size={15} />)}
+      <span className="min-w-0 flex-1 truncate">{label}</span>
+      <span className="text-xs text-slate-400">{n}</span>
+    </button>
+  );
 
   return (
     <>
-      <PageHeader title="Mistake Log" sub="Every wrong answer is a free lesson. Log it, fix it, resolve it." />
-      <div className={`card ${editId ? "ring-2 ring-brand-500" : ""}`}>
-        <div className="grid gap-3 sm:grid-cols-6">
-          <Field label="Subject" className="sm:col-span-2"><select className="input" value={f.subject} onChange={(e) => setF({ ...f, subject: e.target.value })}>{catalog.subjects.map((s) => <option key={s}>{s}</option>)}</select></Field>
-          <Field label="Topic" className="sm:col-span-2"><input className="input" placeholder="e.g. Paging" value={f.topic} onChange={(e) => setF({ ...f, topic: e.target.value })} /></Field>
-          <Field label="Mistake type" className="sm:col-span-2"><select className="input" value={f.kind} onChange={(e) => setF({ ...f, kind: e.target.value as MistakeKind })}>{Object.keys(kinds).map((k) => <option key={k}>{k}</option>)}</select></Field>
-          <Field label="What went wrong" className="sm:col-span-6"><input className="input" value={f.question} onChange={(e) => setF({ ...f, question: e.target.value })} /></Field>
-          <Field label="Correct approach / lesson" className="sm:col-span-4"><input className="input" value={f.fix} onChange={(e) => setF({ ...f, fix: e.target.value })} onKeyDown={(e) => e.key === "Enter" && save()} /></Field>
-          <div className="flex items-end gap-2 sm:col-span-2">
-            <button className="btn flex-1" onClick={save}>{editId ? "Save changes" : "Log it"}</button>
-            {editId && <button className="btn-ghost" onClick={() => { setEditId(null); setF(blank); }}>Cancel</button>}
+      <PageHeader title="Mistake Log" sub="Group mistakes by mock or revision session — every wrong question, with the reason it went wrong." />
+      <div className="grid gap-5 lg:grid-cols-[250px_minmax(0,1fr)]">
+        <aside className="card h-fit space-y-4 !p-3 lg:sticky lg:top-4">
+          <div className="space-y-0.5">
+            <FolderBtn f={{ type: "all" }} label="All mistakes" n={state.mistakes.length} />
+            <FolderBtn f={{ type: "none" }} label="Unsorted" n={count((m) => !m.mockId && !m.session)} />
           </div>
-        </div>
-      </div>
-
-      <div className="my-4 flex flex-wrap items-center gap-2">
-        <div className="flex rounded-xl border border-slate-200 bg-white p-1 dark:border-white/10 dark:bg-white/[.03]">
-          {(["open", "resolved", "all"] as const).map((x) => (
-            <button key={x} onClick={() => setFilter(x)} className={`cursor-pointer rounded-lg px-3 py-1 text-sm capitalize ${filter === x ? "bg-brand-500 text-white" : "text-slate-500"}`}>{x}</button>
-          ))}
-        </div>
-        <select className="input !w-auto" value={kind} onChange={(e) => setKind(e.target.value as MistakeKind | "")}>
-          <option value="">All types</option>{Object.keys(kinds).map((k) => <option key={k}>{k}</option>)}
-        </select>
-        <select className="input !w-auto" value={subject} onChange={(e) => setSubject(e.target.value)}>
-          <option value="">All subjects</option>{catalog.subjects.map((s) => <option key={s}>{s}</option>)}
-        </select>
-        <span className="ml-auto text-sm text-slate-500">{list.length} shown</span>
-      </div>
-
-      <div className="space-y-3">
-        {list.map((m) => (
-          <div key={m.id} className={`card transition ${m.resolved ? "opacity-60" : ""}`}>
-            <div className="flex flex-wrap items-center gap-2">
-              <span className={`chip ${kinds[m.kind]}`}>{m.kind}</span>
-              <span className="text-xs text-slate-500">{m.subject}{m.topic && ` › ${m.topic}`} · {formatDate(m.date)}</span>
-              <div className="ml-auto flex items-center">
-                <button className="icon-btn hover:!text-brand-600" aria-label="Add to revision" title="Add to revision" onClick={() => toRevision(m)}><BookmarkPlus size={15} /></button>
-                <button className="icon-btn hover:!text-brand-600" aria-label="Edit" title="Edit" onClick={() => edit(m)}><Pencil size={14} /></button>
-                <button className="icon-btn hover:!text-emerald-500" aria-label={m.resolved ? "Reopen" : "Resolve"} title={m.resolved ? "Reopen" : "Mark resolved"} onClick={() => patch(m.id, { resolved: !m.resolved })}>{m.resolved ? <Undo2 size={15} /> : <Check size={16} />}</button>
-                <button className="icon-btn" aria-label="Delete" onClick={() => remove("mistakes", m.id, "Mistake")}><Trash2 size={15} /></button>
-              </div>
+          <div>
+            <div className="mb-1 flex items-center gap-1.5 px-2.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400"><Trophy size={12} />Mocks</div>
+            <div className="max-h-64 space-y-0.5 overflow-y-auto">
+              {mocks.map((m) => <FolderBtn key={m.id} f={{ type: "mock", id: m.id }} label={m.name} n={count((x) => x.mockId === m.id)} />)}
+              {!mocks.length && <div className="px-2.5 text-xs text-slate-400">Log a mock first</div>}
             </div>
-            <div className="mt-2 text-sm text-slate-900 dark:text-white">{m.question}</div>
-            {m.fix && <div className="mt-2 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-300">💡 {m.fix}</div>}
           </div>
-        ))}
-        {!list.length && <div className="card"><Empty icon={<TriangleAlert size={28} />} text="Nothing here" /></div>}
+          <div>
+            <div className="mb-1 flex items-center gap-1.5 px-2.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400"><Layers size={12} />Revision sessions</div>
+            <div className="max-h-56 space-y-0.5 overflow-y-auto">
+              {sessions.map((s) => <FolderBtn key={s} f={{ type: "session", name: s }} label={s} n={count((x) => x.session === s)} />)}
+            </div>
+            <div className="mt-2 flex gap-1.5 px-1">
+              <input className="input !py-1 text-xs" placeholder="New session…" value={newSession} onChange={(e) => setNewSession(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addSession()} />
+              <button className="btn !px-2 !py-1" onClick={addSession} aria-label="Create session"><Plus size={14} /></button>
+            </div>
+          </div>
+        </aside>
+
+        <div className="min-w-0 space-y-5">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="mr-2 text-lg font-semibold text-slate-900 dark:text-white">{title}</h2>
+            {folder.type === "mock" && (() => { const m = state.mocks.find((x) => x.id === folder.id); return m ? <span className="text-sm text-slate-500">{formatDate(m.date)} · {m.score}/{m.maxScore}</span> : null; })()}
+            <div className="ml-auto flex flex-wrap items-center gap-2">
+              <select className="input !w-auto" value={kind} onChange={(e) => setKind(e.target.value as MistakeKind | "")}>
+                <option value="">All reasons</option>{REASON_KEYS.map((k) => <option key={k} value={k}>{REASONS[k].label}</option>)}
+              </select>
+              <select className="input !w-auto" value={subject} onChange={(e) => setSubject(e.target.value)}>
+                <option value="">All subjects</option>{catalog.subjects.map((s) => <option key={s}>{s}</option>)}
+              </select>
+              <select className="input !w-auto" value={status} onChange={(e) => setStatus(e.target.value as typeof status)}>
+                <option value="all">Any status</option><option value="open">Not revised</option><option value="resolved">Revised</option>
+              </select>
+            </div>
+          </div>
+
+          <MistakeSheet rows={rows} defaults={defaults} showSource={folder.type === "all" || folder.type === "none"} />
+
+          <div className="grid gap-5 xl:grid-cols-2">
+            <div className="min-w-0"><div className="card-title">Reason breakdown</div><ReasonBreakdown rows={rows} /></div>
+            <div className="min-w-0"><div className="card-title">Subject × reason</div><SubjectMatrix rows={rows} /></div>
+          </div>
+        </div>
       </div>
     </>
   );

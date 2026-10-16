@@ -20,7 +20,7 @@ export default function DataPage() {
   return (
     <>
       <PageHeader title="Settings & Sync" sub="Progress is saved in your browser and synced to Supabase." />
-      <div className="space-y-4">
+      <div className="grid items-start gap-5 xl:grid-cols-2">
         <div className="card">
           <div className="card-title">Goals</div>
           <div className="flex flex-wrap gap-4">

@@ -15,11 +15,15 @@ export type MockAttempt = {
   maxScore: number;
   accuracy?: number;
   timeMin?: number;
+  /** result counts; wrong/skipped fall back to the mistake sheet */
+  correct?: number;
+  wrong?: number;
+  skipped?: number;
   weakSubjects: string[];
   notes: string;
 };
 
-export type MistakeKind = "concept" | "calculation" | "misread" | "guess" | "time";
+export type MistakeKind = "concept" | "forgot" | "silly" | "calculation" | "misread" | "guess" | "time";
 
 export type Mistake = {
   id: string;
@@ -30,6 +34,13 @@ export type Mistake = {
   question: string;
   fix: string;
   resolved: boolean;
+  /** which mock this question came from */
+  mockId?: string;
+  /** or a named revision / practice session (a "folder") */
+  session?: string;
+  qno?: number;
+  marks?: number;
+  result?: "wrong" | "skipped";
 };
 
 export type Revision = {
@@ -79,6 +90,8 @@ export type AppState = {
   todos: TodoItem[];
   pomodoros: PomodoroSession[];
   examDate?: string;
+  /** named revision sessions, so empty folders persist */
+  sessions?: string[];
   /** daily focus goal in minutes */
   dailyGoalMin?: number;
 };

@@ -3,6 +3,7 @@ import { NavLink, Route, Routes, useLocation, useNavigate } from "react-router-d
 import { LayoutDashboard, LineChart, Moon, RotateCcw, Settings, Sun, Timer, TriangleAlert } from "lucide-react";
 import Dashboard from "./pages/Dashboard";
 import Mocks from "./pages/Mocks";
+import MockDetail from "./pages/MockDetail";
 import Mistakes from "./pages/Mistakes";
 import Revisions from "./pages/Revisions";
 import Focus from "./pages/Focus";
@@ -48,7 +49,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen lg:flex">
-      <aside className="hidden w-64 shrink-0 flex-col border-r border-slate-200/80 bg-white px-4 py-5 lg:sticky lg:top-0 lg:flex lg:h-screen dark:border-white/[.07] dark:bg-[#0e111c]">
+      <aside className="hidden w-60 shrink-0 flex-col border-r border-slate-200/80 bg-white px-4 py-5 lg:sticky lg:top-0 lg:flex lg:h-screen dark:border-white/[.07] dark:bg-[#0e111c]">
         <div className="mb-6 flex items-center gap-2.5 px-2">
           <div className="grid size-9 place-items-center rounded-xl bg-gradient-to-br from-brand-500 to-violet-600 text-sm font-bold text-white">G</div>
           <div>
@@ -59,7 +60,7 @@ export default function App() {
         <nav className="space-y-1">
           {links.map(({ to, label, icon: Icon }) => (
             <NavLink key={to} to={to} end={to === "/"}
-              className={({ isActive }) => `flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${isActive ? "bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-50" : "text-slate-500 hover:bg-slate-100 dark:hover:bg-white/5"}`}>
+              className={({ isActive }) => `flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${isActive ? "bg-brand-50 text-brand-700 shadow-[inset_3px_0_0_var(--color-brand-500)] dark:bg-brand-500/15 dark:text-brand-50" : "text-slate-500 hover:bg-slate-100 dark:hover:bg-white/5"}`}>
               <Icon size={18} />{label}
             </NavLink>
           ))}
@@ -86,11 +87,12 @@ export default function App() {
         </div>
       </aside>
 
-      <main className="min-w-0 flex-1 px-4 pb-24 pt-6 sm:px-8 lg:pb-10">
-        <div className="mx-auto max-w-5xl">
+      <main className="min-w-0 flex-1 px-4 pb-24 pt-6 sm:px-6 lg:pb-10 xl:px-10">
+        <div className="mx-auto max-w-[1560px]">
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/mocks" element={<Mocks />} />
+            <Route path="/mocks/:id" element={<MockDetail />} />
             <Route path="/mistakes" element={<Mistakes />} />
             <Route path="/revision" element={<Revisions />} />
             <Route path="/focus" element={<Focus />} />

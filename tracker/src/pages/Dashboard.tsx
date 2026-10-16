@@ -8,6 +8,7 @@ import TimerControls from "../components/TimerControls";
 import { uid } from "../lib/ids";
 import { addDays, daysUntil, formatDate, isSameDay, todayISO } from "../lib/dates";
 import { Empty, PageHeader } from "../components/ui";
+import { REASONS, REASON_KEYS } from "../lib/reasons";
 
 export default function Dashboard() {
   const { state, catalog, setState } = useStore();
@@ -72,86 +73,106 @@ export default function Dashboard() {
     { label: "Mocks taken", value: state.mocks.length, to: "/mocks", tone: "from-emerald-500 to-teal-500" },
   ];
 
+  const topReasons = REASON_KEYS.map((k) => ({ k, n: state.mistakes.filter((m) => m.kind === k).length })).filter((x) => x.n).sort((x, y) => y.n - x.n);
+  const maxReason = topReasons[0]?.n ?? 1;
+
   return (
     <>
-      <PageHeader title={`Good ${hour < 12 ? "morning" : hour < 18 ? "afternoon" : "evening"} 👋`} sub={left !== null ? `${left} days to ${catalog.target}` : `Preparing for ${catalog.target} · set your exam date in Settings`}>
-      </PageHeader>
+      <PageHeader title={`Good ${hour < 12 ? "morning" : hour < 18 ? "afternoon" : "evening"} 👋`} sub={left !== null ? `${left} days to ${catalog.target}` : `Preparing for ${catalog.target} · set your exam date in Settings`} />
 
-      <div className="mb-4 grid gap-4 lg:grid-cols-5">
-        <FocusNow />
-        <QuickAdd />
-      </div>
-
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        {tiles.map((t) => (
-          <Link key={t.label} to={t.to} className="card group relative overflow-hidden transition hover:-translate-y-0.5 hover:shadow-md">
-            <div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${t.tone}`} />
-            <div className="text-xs font-medium text-slate-500">{t.label}</div>
-            <div className="mt-1 text-3xl font-bold text-slate-900 dark:text-white">{t.value}</div>
-          </Link>
-        ))}
-      </div>
-
-      <div className="mt-4 grid gap-4 lg:grid-cols-3">
-        <div className="card lg:col-span-2">
-          <div className="mb-3 flex items-center justify-between">
-            <div className="card-title !mb-0">Focus minutes · last 14 days</div>
-            <span className="chip bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-300"><Flame size={12} className="mr-1" />{streak}-day streak</span>
-          </div>
-          <ResponsiveContainer width="100%" height={180}>
-            <BarChart data={series}>
-              <XAxis dataKey="day" fontSize={10} tickLine={false} axisLine={false} interval={1} />
-              <Tooltip cursor={{ fill: "rgba(99,102,241,.08)" }} />
-              <Bar dataKey="min" fill="#6366f1" radius={[6, 6, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-
-        <div className="card">
-          <div className="card-title flex items-center gap-2"><Target size={15} /> Latest mock</div>
-          {lastMock ? (
-            <>
-              <div className="text-4xl font-bold text-slate-900 dark:text-white">{Math.round((lastMock.score / lastMock.maxScore) * 100)}%</div>
-              <div className="mt-1 text-sm">{lastMock.name}</div>
-              <div className="text-xs text-slate-500">{formatDate(lastMock.date)} · {lastMock.score}/{lastMock.maxScore}</div>
-              {lastMock.weakSubjects.length > 0 && <div className="mt-3 flex flex-wrap gap-1">{lastMock.weakSubjects.map((s) => <span key={s} className="chip bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300">{s}</span>)}</div>}
-            </>
-          ) : <Empty icon={<Target />} text="No mock logged yet" />}
-        </div>
-
-        <div className="card">
-          <div className="card-title flex items-center gap-2"><CalendarRange size={15} /> This week</div>
-          <dl className="grid grid-cols-2 gap-3 text-sm">
-            {week.map(([l, v, sub]) => (
-              <div key={l}><dt className="text-xs text-slate-500">{l}</dt><dd className="text-xl font-bold text-slate-900 dark:text-white">{v}</dd>{sub && <dd className="text-xs text-slate-400">{sub}</dd>}</div>
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
+        <div className="min-w-0 space-y-5">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            {tiles.map((t) => (
+              <Link key={t.label} to={t.to} className="card group relative overflow-hidden !p-4 transition hover:-translate-y-0.5 hover:shadow-md">
+                <div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${t.tone}`} />
+                <div className="text-xs font-medium text-slate-500">{t.label}</div>
+                <div className="mt-1 text-3xl font-bold tabular-nums text-slate-900 dark:text-white">{t.value}</div>
+              </Link>
             ))}
-          </dl>
+          </div>
+
+          <div className="grid gap-5 lg:grid-cols-3">
+            <div className="card lg:col-span-2">
+              <div className="mb-3 flex items-center justify-between">
+                <div className="card-title !mb-0">Focus minutes · last 14 days</div>
+                <span className="chip bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-300"><Flame size={12} className="mr-1" />{streak}-day streak</span>
+              </div>
+              <ResponsiveContainer width="100%" height={190}>
+                <BarChart data={series}>
+                  <XAxis dataKey="day" fontSize={10} tickLine={false} axisLine={false} interval={1} />
+                  <Tooltip cursor={{ fill: "rgba(99,102,241,.08)" }} />
+                  <Bar dataKey="min" fill="#6366f1" radius={[6, 6, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+
+            <div className="card">
+              <div className="card-title flex items-center gap-2"><Target size={15} /> Latest mock</div>
+              {lastMock ? (
+                <Link to={`/mocks/${lastMock.id}`} className="block">
+                  <div className="text-4xl font-bold tabular-nums text-slate-900 dark:text-white">{Math.round((lastMock.score / lastMock.maxScore) * 100)}%</div>
+                  <div className="mt-1 text-sm text-brand-600">{lastMock.name} →</div>
+                  <div className="text-xs text-slate-500">{formatDate(lastMock.date)} · {lastMock.score}/{lastMock.maxScore}</div>
+                  {lastMock.weakSubjects.length > 0 && <div className="mt-3 flex flex-wrap gap-1">{lastMock.weakSubjects.map((s) => <span key={s} className="chip bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300">{s}</span>)}</div>}
+                </Link>
+              ) : <Empty icon={<Target />} text="No mock logged yet" />}
+            </div>
+          </div>
+
+          <div className="grid gap-5 lg:grid-cols-3">
+            <div className="card">
+              <div className="card-title flex items-center gap-2"><CalendarRange size={15} /> This week</div>
+              <dl className="grid grid-cols-2 gap-4 text-sm">
+                {week.map(([l, v, sub]) => (
+                  <div key={l}><dt className="text-xs text-slate-500">{l}</dt><dd className="text-2xl font-bold tabular-nums text-slate-900 dark:text-white">{v}</dd>{sub && <dd className="text-xs text-slate-400">{sub}</dd>}</div>
+                ))}
+              </dl>
+            </div>
+
+            <div className="card">
+              <div className="card-title">Time by subject · 7 days</div>
+              {bySubject.length ? (
+                <ResponsiveContainer width="100%" height={Math.max(130, bySubject.length * 30)}>
+                  <BarChart data={bySubject} layout="vertical"><XAxis type="number" hide /><YAxis type="category" dataKey="subject" width={110} fontSize={11} tickLine={false} axisLine={false} /><Tooltip cursor={{ fill: "rgba(99,102,241,.08)" }} formatter={(v) => [`${v} min`, "Focus"]} /><Bar dataKey="min" fill="#8b5cf6" radius={[0, 6, 6, 0]} /></BarChart>
+                </ResponsiveContainer>
+              ) : <Empty icon={<Target />} text="Pick a subject when you start a session" />}
+            </div>
+
+            <div className="card">
+              <div className="card-title flex items-center justify-between">Why I lose marks <Link to="/mistakes" className="text-xs font-normal text-brand-600">open log →</Link></div>
+              {topReasons.length ? (
+                <div className="space-y-2.5">
+                  {topReasons.map(({ k, n }) => (
+                    <div key={k}>
+                      <div className="mb-1 flex justify-between text-xs"><span>{REASONS[k].label}</span><span className="tabular-nums text-slate-500">{n}</span></div>
+                      <div className="h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-white/10"><div className="h-full rounded-full" style={{ width: `${(n / maxReason) * 100}%`, background: REASONS[k].bar }} /></div>
+                    </div>
+                  ))}
+                </div>
+              ) : <Empty icon={<Target />} text="Log mistakes to see patterns" />}
+            </div>
+          </div>
         </div>
 
-        <div className="card lg:col-span-2">
-          <div className="card-title">Time by subject · last 7 days</div>
-          {bySubject.length ? (
-            <ResponsiveContainer width="100%" height={Math.max(120, bySubject.length * 30)}>
-              <BarChart data={bySubject} layout="vertical"><XAxis type="number" hide /><YAxis type="category" dataKey="subject" width={140} fontSize={11} tickLine={false} axisLine={false} /><Tooltip cursor={{ fill: "rgba(99,102,241,.08)" }} formatter={(v) => [`${v} min`, "Focus"]} /><Bar dataKey="min" fill="#8b5cf6" radius={[0, 6, 6, 0]} /></BarChart>
-            </ResponsiveContainer>
-          ) : <Empty icon={<Target />} text="Pick a subject when you start a session" />}
-        </div>
-
-        <div className="card">
-          <div className="card-title">Revise today</div>
-          {dueRev.length ? dueRev.slice(0, 5).map((r) => (
-            <div key={r.id} className="flex items-center gap-2 border-b border-slate-100 py-2 text-sm last:border-0 dark:border-white/5"><span className="min-w-0 flex-1 truncate">{r.topic}<span className="ml-2 text-xs text-slate-500">{r.subject}</span></span><button className="chip cursor-pointer bg-emerald-100 text-emerald-700 hover:brightness-95 dark:bg-emerald-500/15 dark:text-emerald-300" onClick={() => markRevised(r.id)}>Done</button></div>
-          )) : <Empty icon={<CheckCircle2 />} text="Nothing due 🎉" />}
-        </div>
-
-        <div className="card lg:col-span-2">
-          <div className="card-title">Pending tasks</div>
-          {todos.length ? todos.slice(0, 6).map((t) => (
-            <label key={t.id} className="flex cursor-pointer items-center gap-3 border-b border-slate-100 py-2 text-sm last:border-0 dark:border-white/5">
-              <input type="checkbox" className="size-4 accent-indigo-600" onChange={() => setState((s) => ({ ...s, todos: s.todos.map((x) => (x.id === t.id ? { ...x, status: "done" as const, doneAt: today } : x)) }))} />
-              {t.title}{t.due && <span className={`ml-auto text-xs ${t.due < today ? "text-rose-500" : "text-slate-400"}`}>{formatDate(t.due)}</span>}
-            </label>
-          )) : <Empty icon={<CheckCircle2 />} text="No pending tasks" />}
+        <div className="space-y-5">
+          <FocusNow />
+          <QuickAdd />
+          <div className="card">
+            <div className="card-title flex items-center justify-between">Revise today <span className="text-xs font-normal text-slate-400">{dueRev.length} due</span></div>
+            {dueRev.length ? dueRev.slice(0, 6).map((r) => (
+              <div key={r.id} className="flex items-center gap-2 border-b border-slate-100 py-2 text-sm last:border-0 dark:border-white/5"><span className="min-w-0 flex-1 truncate">{r.topic}<span className="ml-2 text-xs text-slate-500">{r.subject}</span></span><button className="chip cursor-pointer bg-emerald-100 text-emerald-700 hover:brightness-95 dark:bg-emerald-500/15 dark:text-emerald-300" onClick={() => markRevised(r.id)}>Done</button></div>
+            )) : <Empty icon={<CheckCircle2 />} text="Nothing due 🎉" />}
+          </div>
+          <div className="card">
+            <div className="card-title flex items-center justify-between">Pending tasks <Link to="/focus" className="text-xs font-normal text-brand-600">board →</Link></div>
+            {todos.length ? todos.slice(0, 7).map((t) => (
+              <label key={t.id} className="flex cursor-pointer items-center gap-3 border-b border-slate-100 py-2 text-sm last:border-0 dark:border-white/5">
+                <input type="checkbox" className="size-4 accent-indigo-600" onChange={() => setState((s) => ({ ...s, todos: s.todos.map((x) => (x.id === t.id ? { ...x, status: "done" as const, doneAt: today } : x)) }))} />
+                <span className="min-w-0 flex-1 truncate">{t.title}</span>{t.due && <span className={`text-xs ${t.due < today ? "text-rose-500" : "text-slate-400"}`}>{formatDate(t.due)}</span>}
+              </label>
+            )) : <Empty icon={<CheckCircle2 />} text="No pending tasks" />}
+          </div>
         </div>
       </div>
     </>
@@ -165,7 +186,7 @@ function FocusNow() {
   const today = state.pomodoros.filter((x) => x.kind === "focus" && isSameDay(x.startedAt)).reduce((a, x) => a + x.minutes, 0);
   const pct = Math.min(100, Math.round((today / goal) * 100));
   return (
-    <div className="card lg:col-span-2">
+    <div className="card">
       <div className="card-title">Focus now</div>
       <div className="flex items-center gap-4">
         <div className="font-mono text-4xl font-bold text-slate-900 dark:text-white">{formatClock(p.remaining)}</div>
@@ -219,11 +240,11 @@ function QuickAdd() {
   const ph = { task: "Add a task…", mistake: "What did you get wrong?", revision: "Topic you just studied…", mock: "Mock name…" }[tab];
 
   return (
-    <div className="card lg:col-span-3">
-      <div className="mb-3 flex items-center gap-1">
-        <div className="card-title !mb-0 mr-2">Quick add</div>
+    <div className="card">
+      <div className="mb-3 flex flex-wrap items-center gap-1">
+        <div className="card-title !mb-0 mr-1">Add</div>
         {tabs.map(([k, l]) => (
-          <button key={k} onClick={() => setTab(k)} className={`cursor-pointer rounded-lg px-3 py-1 text-sm ${tab === k ? "bg-brand-500 text-white" : "text-slate-500 hover:bg-slate-100 dark:hover:bg-white/5"}`}>{l}</button>
+          <button key={k} onClick={() => setTab(k)} className={`cursor-pointer rounded-lg px-2.5 py-1 text-sm ${tab === k ? "bg-brand-500 text-white" : "text-slate-500 hover:bg-slate-100 dark:hover:bg-white/5"}`}>{l}</button>
         ))}
       </div>
       <div className="flex flex-wrap gap-2">

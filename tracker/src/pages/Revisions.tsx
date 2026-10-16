@@ -63,17 +63,16 @@ export default function Revisions() {
           <div className="flex items-end"><button className="btn w-full" onClick={add}>Add</button></div>
         </div>
       </div>
-      <div className="card mt-4">
+      <div className="mt-5 grid items-start gap-5 xl:grid-cols-2">
+      <div className="card">
         <div className="card-title">Due now · {due.length}</div>
         {due.length ? due.map((r) => <Row key={r.id} r={r} />) : <Empty icon={<CheckCircle2 size={28} />} text="All caught up 🎉" />}
       </div>
-      {later.length > 0 && (
-        <div className="card mt-4">
-          <div className="card-title">Upcoming · {later.length}</div>
-          {later.map((r) => <Row key={r.id} r={r} />)}
-        </div>
-      )}
-      {!rows.length && <div className="card mt-4"><Empty icon={<RotateCcw size={28} />} text="Add a topic after you study it" /></div>}
+      <div className="card">
+        <div className="card-title">Upcoming · {later.length}</div>
+        {later.length ? later.map((r) => <Row key={r.id} r={r} />) : <Empty icon={<RotateCcw size={28} />} text={rows.length ? "Nothing scheduled" : "Add a topic after you study it"} />}
+      </div>
+      </div>
     </>
   );
 }
