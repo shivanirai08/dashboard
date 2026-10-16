@@ -1,0 +1,24 @@
+{
+  "exam": "GATE CSE",
+  "target": "GATE 2027",
+  "hubs": {
+    "gateqaPyq": "https://gateqa.in/gate-cs-pyq/",
+    "gateqaMocks": "https://gateqa.in/mock-tests/",
+    "gateoverflow": "https://gateoverflow.in/"
+  },
+  "subjects": [
+    "General Aptitude",
+    "Engineering Mathematics",
+    "Discrete Mathematics",
+    "Digital Logic",
+    "Computer Organization",
+    "Programming & DS",
+    "Algorithms",
+    "Theory of Computation",
+    "Compiler Design",
+    "Operating Systems",
+    "Databases",
+    "Computer Networks",
+    "Software Engineering"
+  ]
+}
