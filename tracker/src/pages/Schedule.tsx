@@ -256,6 +256,8 @@ function DayView({ date, today, now, stats, backlog, onEdit, onNew, onToggle }: 
               const height = Math.max(24, (plannedMin(t) / 60) * HOUR_PX - 2);
               const c = tone(t, today);
               const done = t.status === "done";
+              // as many notes (max 2) as fit under the title and time line
+              const noteLines = Math.max(0, Math.min(2, t.notes?.length ?? 0, Math.floor((height - 8 - 20 - (height >= 44 ? 16 : 0)) / 15)));
               return (
                 <div key={t.id} {...dragProps(t.id)} className={`absolute cursor-pointer overflow-hidden rounded-lg border text-left shadow-sm transition hover:shadow-md ${c.box}`}
                   style={{ top, height, left: `calc(${(lane / n) * 100}% + 2px)`, width: `calc(${100 / n}% - 4px)` }} onClick={() => onEdit(t)}>
@@ -265,6 +267,12 @@ function DayView({ date, today, now, stats, backlog, onEdit, onNew, onToggle }: 
                     <button className="min-w-0 flex-1 cursor-pointer text-left" onClick={(e) => { e.stopPropagation(); onEdit(t); }} aria-label={`Edit ${t.title}`}>
                       <div className={`truncate text-sm font-semibold leading-tight ${done ? "line-through opacity-70" : ""}`}>{t.revision && <Repeat size={12} className="mr-1 inline" aria-label="Revision" />}{t.title}</div>
                       {height >= 44 && <div className="truncate text-[11px] opacity-75">{clock12(t.start!)} – {clock12(t.end!)}{!!t.subjects?.length && ` · ${t.subjects.join(", ")}`}{!!t.timeMin && ` · ⏱ ${fmtDur(t.timeMin)}`}</div>}
+                      {noteLines > 0 && (
+                        <div className="mt-0.5 space-y-0.5">
+                          {t.notes!.slice(0, noteLines).map((n) => <div key={n.id} className="truncate border-l-2 border-current/40 pl-1.5 text-[11px] leading-[14px] opacity-80" title={n.text}>{n.text}</div>)}
+                          {t.notes!.length > noteLines && <div className="pl-2 text-[10px] opacity-60">+{t.notes!.length - noteLines} more</div>}
+                        </div>
+                      )}
                     </button>
                     <NotesButton task={t} className="!size-6" />
                     <PlayButton task={t} className="!size-6" />
