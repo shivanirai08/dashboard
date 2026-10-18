@@ -9,7 +9,7 @@ import { NotesButton } from "./TaskNotes";
 import { useTasks } from "../lib/useTasks";
 import { addDays, daysUntil, formatDate, todayISO } from "../lib/dates";
 import { clock12, fmtDur } from "../lib/schedule";
-import { columnOf, dayCounter, phaseOf, plannedMin, type Column } from "../lib/tasks";
+import { columnOf, dayCounter, overdueDay, phaseOf, plannedMin, type Column } from "../lib/tasks";
 import type { Priority, TodoItem } from "../lib/types";
 
 export const DRAG_TASK = "application/x-task-id";
@@ -88,6 +88,7 @@ export default function TaskBoard({ tasks, onEdit, onDelete }: Props) {
                       {t.subjects?.map((x) => <span key={x} className={`chip ${subjectTone(x)}`}>{x}</span>)}
                       {t.revision && <span className="chip bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300"><Repeat size={11} className="mr-1" />every {t.revision.intervalDays}d</span>}
                       {phase === "overdue" && <span className="chip bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300">{-daysUntil(t.due ?? t.planned ?? today)}d overdue</span>}
+                      {overdueDay(t, today) && <span className="chip bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300">Overdue day {overdueDay(t, today)}</span>}
                       {counter && <span className="chip bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300">{counter}</span>}
                     </div>
                     {(when || t.due) && (

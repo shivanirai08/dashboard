@@ -12,7 +12,7 @@ import TaskDialog, { type TaskDraft } from "../components/TaskDialog";
 import TaskBoard, { DRAG_TASK } from "../components/TaskBoard";
 import PlayButton from "../components/PlayButton";
 import { clock12, dayStats, fmtDur, fromMin, layoutLanes, monthDates, toMin, weekDates, weekStartOf, type DayStats } from "../lib/schedule";
-import { columnOf, dayCounter, phaseOf, plannedMin, tasksBetween } from "../lib/tasks";
+import { columnOf, dayCounter, missedOn, overdueDay, phaseOf, plannedMin, tasksBetween } from "../lib/tasks";
 import type { TodoItem } from "../lib/types";
 
 type Range = "day" | "week" | "month";
@@ -174,7 +174,11 @@ function DayView({ date, today, now, stats, backlog, onEdit, onNew, onToggle }: 
   const strip = stats.tasks.filter((t) => !timedIds.has(t.id));
   const startH = Math.min(6, ...timed.map((t) => Math.floor(toMin(t.start!) / 60)));
   const hours = Array.from({ length: END_H - startH }, (_, i) => startH + i);
-  const lanes = layoutLanes(timed);
+  // faded copies of tasks that were left unfinished on this day and moved on
+  const ghosts = missedOn(state, date);
+  const ghostTimed = ghosts.filter((g) => g.slot.start && g.slot.end);
+  const ghostStrip = ghosts.filter((g) => !(g.slot.start && g.slot.end));
+  const lanes = layoutLanes([...timed, ...ghostTimed.map((g) => ({ id: `ghost-${g.task.id}`, start: g.slot.start, end: g.slot.end }))]);
   const isToday = date === today;
   const past = date < today;
   const nowMin = now.getHours() * 60 + now.getMinutes();
@@ -212,10 +216,16 @@ function DayView({ date, today, now, stats, backlog, onEdit, onNew, onToggle }: 
             <button className="ml-auto cursor-pointer font-semibold underline-offset-2 hover:underline" onClick={carryOver}>Move to today</button>
           </div>
         )}
-        {strip.length > 0 && (
+        {(strip.length > 0 || ghostStrip.length > 0) && (
           <div className="border-b border-slate-100 px-4 py-2.5 dark:border-white/[.06]">
             <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">In progress · carried over</div>
             <div className="flex flex-wrap gap-2">
+              {ghostStrip.map(({ task: t }) => (
+                <div key={`ghost-${t.id}`} className="flex max-w-full items-center gap-2 rounded-lg border border-dashed border-amber-300 bg-amber-50/50 px-2 py-1 text-sm text-amber-900/70 dark:border-amber-500/30 dark:bg-amber-500/5 dark:text-amber-100/70">
+                  <button className="min-w-0 cursor-pointer truncate text-left font-medium" onClick={() => onEdit(t)}>{t.title}</button>
+                  <span className="shrink-0 text-[11px] font-semibold">not finished · moved to {shortDay(t.planned ?? today)}</span>
+                </div>
+              ))}
               {strip.map((t) => {
                 const late = phaseOf(t, today) === "overdue";
                 const counter = dayCounter(t, date);
@@ -225,6 +235,7 @@ function DayView({ date, today, now, stats, backlog, onEdit, onNew, onToggle }: 
                     <button className={`min-w-0 cursor-pointer truncate text-left font-medium ${t.status === "done" ? "line-through opacity-70" : ""}`} onClick={() => onEdit(t)}>{t.revision && <Repeat size={12} className="mr-1 inline" aria-label="Revision" />}{t.title}</button>
                     {late && <span className="shrink-0 text-[11px] font-semibold">{-daysUntil(t.due ?? t.planned ?? today)}d overdue</span>}
                     {counter && <span className="shrink-0 text-[11px] opacity-70">{counter}</span>}
+                    {overdueDay(t, today) && <span className="shrink-0 rounded bg-rose-100 px-1 text-[11px] font-semibold text-rose-700 dark:bg-rose-500/20 dark:text-rose-200">Overdue day {overdueDay(t, today)}</span>}
                     {late && isToday && <button className="shrink-0 cursor-pointer text-[11px] font-semibold underline-offset-2 hover:underline" onClick={() => reschedule(t.id, today)}>Move to today</button>}
                     <NotesButton task={t} className="!size-6" />
                     <PlayButton task={t} className="!size-6" />
@@ -250,6 +261,22 @@ function DayView({ date, today, now, stats, backlog, onEdit, onNew, onToggle }: 
               </div>
             )}
 
+            {ghostTimed.map(({ task: t, slot }) => {
+              const { lane, lanes: n } = lanes.get(`ghost-${t.id}`) ?? { lane: 0, lanes: 1 };
+              const top = ((toMin(slot.start!) - startH * 60) / 60) * HOUR_PX;
+              const height = Math.max(24, ((toMin(slot.end!) - toMin(slot.start!)) / 60) * HOUR_PX - 2);
+              return (
+                <div key={`ghost-${t.id}`} className="absolute cursor-pointer overflow-hidden rounded-lg border border-dashed border-amber-300 bg-amber-50/50 text-left text-amber-900/70 transition hover:bg-amber-50 dark:border-amber-500/30 dark:bg-amber-500/5 dark:text-amber-100/70"
+                  style={{ top, height, left: `calc(${(lane / n) * 100}% + 2px)`, width: `calc(${100 / n}% - 4px)` }} onClick={(e) => { e.stopPropagation(); onEdit(t); }}>
+                  <span className="absolute inset-y-0 left-0 w-1 bg-amber-400/60" />
+                  <div className="py-1 pl-3 pr-2">
+                    <div className="truncate text-sm font-semibold leading-tight">{t.title}</div>
+                    {height >= 44 && <div className="truncate text-[11px]">{clock12(slot.start!)} – {clock12(slot.end!)} · not finished{t.planned ? ` · moved to ${shortDay(t.planned)}` : ""}</div>}
+                  </div>
+                </div>
+              );
+            })}
+
             {timed.map((t) => {
               const { lane, lanes: n } = lanes.get(t.id) ?? { lane: 0, lanes: 1 };
               const top = ((toMin(t.start!) - startH * 60) / 60) * HOUR_PX;
@@ -257,7 +284,7 @@ function DayView({ date, today, now, stats, backlog, onEdit, onNew, onToggle }: 
               const c = tone(t, today);
               const done = t.status === "done";
               // as many notes (max 2) as fit under the title and time line
-              const noteLines = Math.max(0, Math.min(2, t.notes?.length ?? 0, Math.floor((height - 8 - 20 - (height >= 44 ? 16 : 0)) / 15)));
+              const noteLines = Math.max(0, Math.min(2, t.notes?.length ?? 0, Math.floor((height - 8 - 20 - (height >= 44 ? 16 : 0)) / 18)));
               return (
                 <div key={t.id} {...dragProps(t.id)} className={`absolute cursor-pointer overflow-hidden rounded-lg border text-left shadow-sm transition hover:shadow-md ${c.box}`}
                   style={{ top, height, left: `calc(${(lane / n) * 100}% + 2px)`, width: `calc(${100 / n}% - 4px)` }} onClick={() => onEdit(t)}>
@@ -266,11 +293,12 @@ function DayView({ date, today, now, stats, backlog, onEdit, onNew, onToggle }: 
                     <input type="checkbox" className="mt-0.5 size-4 shrink-0 cursor-pointer accent-emerald-600" checked={done} onClick={(e) => e.stopPropagation()} onChange={() => onToggle(t)} aria-label={`Mark “${t.title}” ${done ? "not done" : "done"}`} />
                     <button className="min-w-0 flex-1 cursor-pointer text-left" onClick={(e) => { e.stopPropagation(); onEdit(t); }} aria-label={`Edit ${t.title}`}>
                       <div className={`truncate text-sm font-semibold leading-tight ${done ? "line-through opacity-70" : ""}`}>{t.revision && <Repeat size={12} className="mr-1 inline" aria-label="Revision" />}{t.title}</div>
+                      {overdueDay(t, today) && <span className="mr-1 rounded bg-rose-100 px-1 text-[10px] font-semibold text-rose-700 dark:bg-rose-500/20 dark:text-rose-200">Overdue day {overdueDay(t, today)}</span>}
                       {height >= 44 && <div className="truncate text-[11px] opacity-75">{clock12(t.start!)} – {clock12(t.end!)}{!!t.subjects?.length && ` · ${t.subjects.join(", ")}`}{!!t.timeMin && ` · ⏱ ${fmtDur(t.timeMin)}`}</div>}
                       {noteLines > 0 && (
                         <div className="mt-0.5 space-y-0.5">
-                          {t.notes!.slice(0, noteLines).map((n) => <div key={n.id} className="truncate border-l-2 border-current/40 pl-1.5 text-[11px] leading-[14px] opacity-80" title={n.text}>{n.text}</div>)}
-                          {t.notes!.length > noteLines && <div className="pl-2 text-[10px] opacity-60">+{t.notes!.length - noteLines} more</div>}
+                          {t.notes!.slice(0, noteLines).map((n) => <div key={n.id} className="truncate border-l-2 border-current/50 pl-1.5 text-[13px] font-medium leading-[17px]" title={n.text}>{n.text}</div>)}
+                          {t.notes!.length > noteLines && <div className="pl-2 text-[11px] opacity-70">+{t.notes!.length - noteLines} more</div>}
                         </div>
                       )}
                     </button>
@@ -355,6 +383,7 @@ function DayView({ date, today, now, stats, backlog, onEdit, onNew, onToggle }: 
 type WeekProps = { stats: DayStats[]; today: string; onOpen: (d: string) => void; onToggle: (t: TodoItem) => void; onEdit: (t: TodoItem) => void; onNew: (d: string) => void; onMove: (id: string, d: string) => void };
 
 function WeekView({ stats, today, onOpen, onToggle, onEdit, onNew, onMove }: WeekProps) {
+  const { state } = useStore();
   return (
     <div className="grid gap-3 md:grid-cols-7">
       {stats.map((s) => {
@@ -390,6 +419,12 @@ function WeekView({ stats, today, onOpen, onToggle, onEdit, onNew, onMove }: Wee
                   </div>
                 );
               })}
+              {missedOn(state, s.date).map(({ task: t, slot }) => (
+                <button key={`ghost-${t.id}`} onClick={() => onEdit(t)} className="block w-full cursor-pointer rounded-lg border border-dashed border-amber-300 bg-amber-50/50 px-1.5 py-1 text-left text-xs text-amber-900/70 dark:border-amber-500/30 dark:bg-amber-500/5 dark:text-amber-100/70">
+                  <div className="truncate font-medium">{t.title}</div>
+                  <div className="text-[10px]">{slot.start ? `${clock12(slot.start)} · ` : ""}not finished · moved on</div>
+                </button>
+              ))}
             </div>
           </section>
         );

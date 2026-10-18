@@ -72,6 +72,27 @@ export function columnOf(t: TodoItem, today = todayISO()): Column {
   return start <= today ? "doing" : "todo";
 }
 
+export const daysBetween = (from: string, to: string) =>
+  Math.round((new Date(`${to}T12:00:00`).getTime() - new Date(`${from}T12:00:00`).getTime()) / 86_400_000);
+
+/** Patch that remembers the slot an overdue task is leaving, so its original day keeps a copy. */
+export function missPatch(t: TodoItem, newDate: string, today = todayISO()): Pick<TodoItem, "missed"> | undefined {
+  if (t.status === "done" || !t.planned || phaseOf(t, today) !== "overdue" || newDate < today || newDate <= t.planned) return undefined;
+  if (t.missed?.some((m) => m.date === t.planned)) return undefined;
+  return { missed: [...(t.missed ?? []), { date: t.planned, start: t.start, end: t.end }] };
+}
+
+/** Faded copies shown on days where a task was missed (it has since moved to another day). */
+export const missedOn = (state: AppState, date: string) =>
+  state.todos.flatMap((t) => (t.planned === date ? [] : (t.missed ?? []).filter((m) => m.date === date).map((slot) => ({ task: t, slot }))));
+
+/** "Overdue day 2": days since it was first missed, for unfinished tasks that have been carried over */
+export function overdueDay(t: TodoItem, today = todayISO()): number | null {
+  if (t.status === "done" || !t.missed?.length) return null;
+  const n = daysBetween(t.missed[0].date, today);
+  return n >= 1 ? n : null;
+}
+
 /** "Day 2 of 4" for a task spanning several days */
 export function dayCounter(t: TodoItem, today = todayISO()): string | null {
   if (!t.planned || !t.due || t.planned >= t.due || t.status === "done") return null;

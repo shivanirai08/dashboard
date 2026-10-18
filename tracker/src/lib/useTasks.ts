@@ -4,7 +4,7 @@ import { addDays, todayISO } from "./dates";
 import { uid } from "./ids";
 import { nextInterval } from "./revision";
 import { fromMin, nowHM, toMin } from "./schedule";
-import type { Column } from "./tasks";
+import { missPatch, type Column } from "./tasks";
 import { useStore } from "./store";
 import type { TaskNote, TodoItem, TodoStatus } from "./types";
 
@@ -104,10 +104,11 @@ export function useTasks() {
       ...s,
       todos: s.todos.map((t) => {
         if (t.id !== id || t.status === "done") return t; // finished tasks stay where they were done
-        if (t.revision && !t.start && !start) return withTime(t, { planned: date }, true);
+        const miss = missPatch(t, date) ?? {};
+        if (t.revision && !t.start && !start) return withTime(t, { ...miss, planned: date }, true);
         const len = t.start && t.end ? toMin(t.end) - toMin(t.start) : DEFAULT_LEN;
         const st = start ?? nowHM();
-        return withTime(t, { planned: date, start: st, end: fromMin(toMin(st) + len) });
+        return withTime(t, { ...miss, planned: date, start: st, end: fromMin(toMin(st) + len) });
       }),
     }));
   }, [setState]);
