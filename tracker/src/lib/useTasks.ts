@@ -6,7 +6,7 @@ import { nextInterval } from "./revision";
 import { fromMin, nowHM, toMin } from "./schedule";
 import type { Column } from "./tasks";
 import { useStore } from "./store";
-import type { TodoItem, TodoStatus } from "./types";
+import type { TaskNote, TodoItem, TodoStatus } from "./types";
 
 const DEFAULT_LEN = 60;
 
@@ -130,5 +130,23 @@ export function useTasks() {
     setStatus(t.id, "todo");
   }, [setStatus, update, reschedule]);
 
-  return { create, update, setStatus, toggleDone, reschedule, moveTo, review };
+  const patchNotes = useCallback((id: string, fn: (notes: TaskNote[]) => TaskNote[]) => {
+    setState((s) => ({ ...s, todos: s.todos.map((t) => {
+      if (t.id !== id) return t;
+      const notes = fn(t.notes ?? []);
+      return { ...t, notes: notes.length ? notes : undefined };
+    }) }));
+  }, [setState]);
+
+  const addNote = useCallback((id: string, text: string) => {
+    if (!text.trim()) return;
+    patchNotes(id, (n) => [{ id: uid(), text: text.trim(), createdAt: new Date().toISOString() }, ...n]);
+  }, [patchNotes]);
+  const editNote = useCallback((id: string, noteId: string, text: string) => {
+    if (!text.trim()) return;
+    patchNotes(id, (n) => n.map((x) => (x.id === noteId ? { ...x, text: text.trim(), updatedAt: new Date().toISOString() } : x)));
+  }, [patchNotes]);
+  const deleteNote = useCallback((id: string, noteId: string) => patchNotes(id, (n) => n.filter((x) => x.id !== noteId)), [patchNotes]);
+
+  return { create, update, setStatus, toggleDone, reschedule, moveTo, review, addNote, editNote, deleteNote };
 }

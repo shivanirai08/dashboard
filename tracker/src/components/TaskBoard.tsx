@@ -5,6 +5,7 @@ import { Repeat } from "lucide-react";
 import { subjectTone } from "../lib/subjects";
 import { useToast } from "./Toast";
 import PlayButton from "./PlayButton";
+import { NotesButton } from "./TaskNotes";
 import { useTasks } from "../lib/useTasks";
 import { addDays, daysUntil, formatDate, todayISO } from "../lib/dates";
 import { clock12, fmtDur } from "../lib/schedule";
@@ -78,6 +79,7 @@ export default function TaskBoard({ tasks, onEdit, onDelete }: Props) {
                     <div className="flex items-start gap-2">
                       <input type="checkbox" className="mt-0.5 size-4 shrink-0 cursor-pointer accent-indigo-600" checked={done} onChange={() => toggleDone(t)} aria-label={`Mark “${t.title}” ${done ? "not done" : "done"}`} />
                       <button className={`min-w-0 flex-1 cursor-pointer text-left text-sm font-medium ${done ? "text-slate-400 line-through" : "text-slate-900 dark:text-white"}`} onClick={() => onEdit(t)}>{t.title}</button>
+                      <NotesButton task={t} className="!size-6" />
                       <PlayButton task={t} className="!size-6" />
                       <button className="icon-btn !size-6 shrink-0" aria-label={`Delete “${t.title}”`} onClick={() => onDelete(t)}><Trash2 size={13} /></button>
                     </div>

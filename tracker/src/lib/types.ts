@@ -57,6 +57,13 @@ export type Revision = {
 export type TodoStatus = "todo" | "doing" | "done";
 export type Priority = "low" | "med" | "high";
 
+export type TaskNote = {
+  id: string;
+  text: string;
+  createdAt: string;
+  updatedAt?: string;
+};
+
 export type TodoItem = {
   id: string;
   title: string;
@@ -84,6 +91,8 @@ export type TodoItem = {
   /** deadline pushed back this many times */
   extensions?: number;
   originalDue?: string;
+  /** free-form notes the user jots down against this task (separate from the edit dialog) */
+  notes?: TaskNote[];
   /** total minutes logged against this task */
   timeMin?: number;
   createdAt: string;

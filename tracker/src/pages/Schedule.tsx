@@ -7,6 +7,7 @@ import { useRemove } from "../lib/undo";
 import { useTasks } from "../lib/useTasks";
 import { addDays, daysUntil, isSameDay, todayISO } from "../lib/dates";
 import { Empty, PageHeader } from "../components/ui";
+import { NotesButton } from "../components/TaskNotes";
 import TaskDialog, { type TaskDraft } from "../components/TaskDialog";
 import TaskBoard, { DRAG_TASK } from "../components/TaskBoard";
 import PlayButton from "../components/PlayButton";
@@ -225,6 +226,7 @@ function DayView({ date, today, now, stats, backlog, onEdit, onNew, onToggle }: 
                     {late && <span className="shrink-0 text-[11px] font-semibold">{-daysUntil(t.due ?? t.planned ?? today)}d overdue</span>}
                     {counter && <span className="shrink-0 text-[11px] opacity-70">{counter}</span>}
                     {late && isToday && <button className="shrink-0 cursor-pointer text-[11px] font-semibold underline-offset-2 hover:underline" onClick={() => reschedule(t.id, today)}>Move to today</button>}
+                    <NotesButton task={t} className="!size-6" />
                     <PlayButton task={t} className="!size-6" />
                   </div>
                 );
@@ -264,6 +266,7 @@ function DayView({ date, today, now, stats, backlog, onEdit, onNew, onToggle }: 
                       <div className={`truncate text-sm font-semibold leading-tight ${done ? "line-through opacity-70" : ""}`}>{t.revision && <Repeat size={12} className="mr-1 inline" aria-label="Revision" />}{t.title}</div>
                       {height >= 44 && <div className="truncate text-[11px] opacity-75">{clock12(t.start!)} – {clock12(t.end!)}{!!t.subjects?.length && ` · ${t.subjects.join(", ")}`}{!!t.timeMin && ` · ⏱ ${fmtDur(t.timeMin)}`}</div>}
                     </button>
+                    <NotesButton task={t} className="!size-6" />
                     <PlayButton task={t} className="!size-6" />
                   </div>
                 </div>
@@ -311,6 +314,7 @@ function DayView({ date, today, now, stats, backlog, onEdit, onNew, onToggle }: 
           {backlog.length ? backlog.slice(0, 6).map((t) => (
             <div key={t.id} className="flex items-center gap-2 py-1.5 text-sm" {...dragProps(t.id)}>
               <button className="min-w-0 flex-1 cursor-pointer truncate text-left text-slate-800 dark:text-slate-100" title={t.title} onClick={() => onEdit(t)}>{t.title}</button>
+              <NotesButton task={t} className="!size-6" />
               {!past && <button className="chip cursor-pointer border border-slate-200 hover:bg-slate-100 dark:border-white/10 dark:hover:bg-white/10" onClick={() => reschedule(t.id, date)} aria-label={`Schedule “${t.title}” on ${shortDay(date)}`}>{isToday ? "Today" : shortDay(date)}</button>}
             </div>
           )) : <div className="py-2 text-sm text-slate-400">Nothing waiting. Use “Keep in todo” when adding a task you haven’t placed yet.</div>}
@@ -373,6 +377,7 @@ function WeekView({ stats, today, onOpen, onToggle, onEdit, onNew, onMove }: Wee
                       <div className={`truncate font-medium ${t.status === "done" ? "line-through opacity-70" : ""}`}>{t.revision && <Repeat size={10} className="mr-1 inline" aria-label="Revision" />}{t.title}</div>
                       <div className="text-[10px] opacity-70">{own && t.start ? clock12(t.start) : own ? "all day" : dayCounter(t, s.date) ?? "carried over"}</div>
                     </button>
+                    <NotesButton task={t} className="!size-5" />
                     {s.date === today && <PlayButton task={t} className="!size-5" />}
                   </div>
                 );
