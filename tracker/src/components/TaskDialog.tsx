@@ -5,7 +5,7 @@ import { addDays, todayISO } from "../lib/dates";
 import { uid } from "../lib/ids";
 import { useTasks } from "../lib/useTasks";
 import { fmtDur, fromMin, nowHM, toMin } from "../lib/schedule";
-import { Field } from "./ui";
+import { Field, HoursInput } from "./ui";
 import SubjectPicker from "./SubjectPicker";
 import { usePomodoro } from "../lib/pomodoro";
 import type { Priority, TodoItem, TodoStatus } from "../lib/types";
@@ -19,7 +19,7 @@ export type TaskDraft = Partial<TodoItem> & { title?: string };
  *   Revision     → a task that repeats on a spaced schedule (1 → 3 → 7 → 14 → 30 → 60 days)
  */
 export default function TaskDialog({ draft, onClose, onDelete }: { draft: TaskDraft; onClose: () => void; onDelete: (t: TodoItem) => void }) {
-  const { catalog } = useStore();
+  const { catalog, state } = useStore();
   const { create, update, setStatus: setTaskStatus } = useTasks();
   const p = usePomodoro();
   const isNew = !draft.id;
@@ -36,7 +36,7 @@ export default function TaskDialog({ draft, onClose, onDelete }: { draft: TaskDr
   const [due, setDue] = useState(draft.due ?? "");
   const [showDue, setShowDue] = useState(!!draft.due);
   const [status, setStatus] = useState<TodoStatus>(draft.status ?? "todo");
-  const [logged, setLogged] = useState(String(draft.timeMin ?? 0));
+  const [logged, setLogged] = useState<number | undefined>(draft.timeMin ?? 0);
   const [err, setErr] = useState("");
   const titleRef = useRef<HTMLInputElement>(null);
 
@@ -52,6 +52,8 @@ export default function TaskDialog({ draft, onClose, onDelete }: { draft: TaskDr
     if (!title.trim()) return setErr("Give the task a title.");
     if (scheduled && !date) return setErr("Pick a date, or choose “Keep in todo”.");
     if (scheduled && start && end && toMin(end) <= toMin(start)) return setErr("End time must be after the start time.");
+    // with "Lock past days" on, nothing new may land on a day that has gone (staying on its own old day is fine)
+    if (state.lockPastDays && scheduled && date < todayISO() && date !== draft.planned) return setErr("Past days are locked (Settings). Pick today or a later date.");
     if (scheduled && showDue && due && due < date) return setErr("The deadline can’t be before the date.");
     const fields: Partial<TodoItem> = {
       title: title.trim(),
@@ -69,7 +71,7 @@ export default function TaskDialog({ draft, onClose, onDelete }: { draft: TaskDr
     else {
       // finishing a revision goes through the spaced-repetition path so the next one gets scheduled
       const finishing = !!draft.revision && isRev && status === "done" && draft.status !== "done";
-      update(draft.id!, { ...fields, status: finishing ? draft.status : status, timeMin: Math.max(0, Number(logged) || 0) }, { untimed });
+      update(draft.id!, { ...fields, status: finishing ? draft.status : status, timeMin: logged ?? 0 }, { untimed });
       if (finishing) setTaskStatus(draft.id!, "done");
     }
     onClose();
@@ -159,7 +161,7 @@ export default function TaskDialog({ draft, onClose, onDelete }: { draft: TaskDr
         {!isNew && (
           <div className="grid grid-cols-2 gap-3">
             <Field label="Status"><select className="input" value={status} onChange={(e) => setStatus(e.target.value as TodoStatus)}><option value="todo">To do</option><option value="doing">In progress</option><option value="done">Done</option></select></Field>
-            <Field label="Time logged (min)"><input type="number" min={0} className="input" value={logged} onChange={(e) => setLogged(e.target.value)} /></Field>
+            <Field label="Time logged (hours.min)"><HoursInput minutes={logged} onChange={setLogged} /></Field>
           </div>
         )}
 

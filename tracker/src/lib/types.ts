@@ -8,7 +8,8 @@ export type MockAttempt = {
   id: string;
   name: string;
   source: string;
-  type?: "full" | "custom";
+  /** full mock, custom mock over chosen subjects, or a short subject test (1–2 subjects) */
+  type?: "full" | "custom" | "test";
   subjects?: string[];
   date: string;
   score: number;
@@ -138,6 +139,8 @@ export type AppState = {
   examDate?: string;
   /** named revision sessions, so empty folders persist */
   sessions?: string[];
+  /** when on, no new tasks can be put on days that have already passed (existing ones can still be edited) */
+  lockPastDays?: boolean;
   /** daily focus goal in minutes */
   dailyGoalMin?: number;
 };

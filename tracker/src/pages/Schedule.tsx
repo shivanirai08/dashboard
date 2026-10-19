@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { AlertCircle, CalendarDays, Check, ChevronLeft, ChevronRight, Clock, Inbox, KanbanSquare, Plus, Repeat, Target } from "lucide-react";
 import { useStore } from "../lib/store";
+import { useToast } from "../components/Toast";
 import { useRemove } from "../lib/undo";
 import { useTasks } from "../lib/useTasks";
 import { addDays, daysUntil, isSameDay, todayISO } from "../lib/dates";
@@ -59,6 +60,7 @@ const dragProps = (id: string) => ({ draggable: true, onDragStart: (e: React.Dra
 
 export default function Schedule() {
   const { state } = useStore();
+  const toast = useToast();
   const remove = useRemove();
   const { toggleDone, reschedule } = useTasks();
   const today = todayISO();
@@ -79,7 +81,7 @@ export default function Schedule() {
   // /schedule?new=1 (dashboard button, "N" shortcut) opens the add dialog
   useEffect(() => {
     if (params.get("new")) {
-      setDraft({ planned: date });
+      setDraft({ planned: state.lockPastDays && date < today ? today : date });
       setParams({}, { replace: true });
     }
   }, [params]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -98,10 +100,12 @@ export default function Schedule() {
   const inRange = tasksBetween(state, dates[0], dates[dates.length - 1], today);
   const backlog = state.todos.filter((t) => columnOf(t, today) === "backlog");
 
-  const openNew = (extra: TaskDraft = {}) => setDraft({ planned: date, ...extra });
+  const locked = (d: string) => !!state.lockPastDays && d < today;
+  const openNew = (extra: TaskDraft = {}) => setDraft({ planned: locked(date) ? today : date, ...extra });
   const del = (t: TodoItem) => { setDraft(null); remove("todos", t.id, "Task"); };
   const moveToDay = (id: string, d: string) => {
     const t = state.todos.find((x) => x.id === id);
+    if (t && locked(d)) return toast("Past days are locked — turn this off in Settings to add tasks there.");
     if (t && t.planned !== d) reschedule(id, d, t.start);
   };
 
@@ -191,13 +195,15 @@ function DayView({ date, today, now, stats, backlog, onEdit, onNew, onToggle }: 
     el.scrollTop = Math.max(0, ((focusMin - startH * 60) / 60) * HOUR_PX);
   }, [date]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const locked = !!state.lockPastDays && past;
   const clickGrid = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (e.target !== e.currentTarget) return;
+    if (e.target !== e.currentTarget || locked) return;
     const y = e.clientY - e.currentTarget.getBoundingClientRect().top;
     const s = Math.min(23 * 60, startH * 60 + Math.floor(((y / HOUR_PX) * 60) / 30) * 30);
     onNew({ start: fromMin(s), end: fromMin(Math.min(24 * 60, s + 60)) });
   };
   const dropOnGrid = (id: string, e: React.DragEvent<HTMLDivElement>) => {
+    if (locked) return;
     const y = e.clientY - e.currentTarget.getBoundingClientRect().top;
     reschedule(id, date, fromMin(Math.min(23 * 60, startH * 60 + Math.floor(((y / HOUR_PX) * 60) / 15) * 15)));
   };
@@ -246,7 +252,7 @@ function DayView({ date, today, now, stats, backlog, onEdit, onNew, onToggle }: 
           </div>
         )}
         <div ref={scroller} className="max-h-[68vh] min-h-[420px] overflow-y-auto">
-          <div className="relative ml-14 mr-3 cursor-copy" style={{ height: hours.length * HOUR_PX }} onClick={clickGrid} title="Click an empty slot to add a task"
+          <div className={`relative ml-14 mr-3 ${locked ? "" : "cursor-copy"}`} style={{ height: hours.length * HOUR_PX }} onClick={clickGrid} title={locked ? "Past days are locked" : "Click an empty slot to add a task"}
             {...dropProps(() => {})} onDrop={(e) => { const id = e.dataTransfer.getData(DRAG_TASK); if (id) { e.preventDefault(); dropOnGrid(id, e); } }}>
             {hours.map((h, i) => (
               <div key={h} className="pointer-events-none absolute inset-x-0 border-t border-slate-100 dark:border-white/[.06]" style={{ top: i * HOUR_PX }}>
@@ -266,7 +272,7 @@ function DayView({ date, today, now, stats, backlog, onEdit, onNew, onToggle }: 
               const top = ((toMin(slot.start!) - startH * 60) / 60) * HOUR_PX;
               const height = Math.max(24, ((toMin(slot.end!) - toMin(slot.start!)) / 60) * HOUR_PX - 2);
               return (
-                <div key={`ghost-${t.id}`} className="absolute cursor-pointer overflow-hidden rounded-lg border border-dashed border-amber-300 bg-amber-50/50 text-left text-amber-900/70 transition hover:bg-amber-50 dark:border-amber-500/30 dark:bg-amber-500/5 dark:text-amber-100/70"
+                <div key={`ghost-${t.id}`} className="absolute cursor-pointer overflow-hidden rounded-lg border border-dashed border-amber-300 bg-amber-50/50 text-left text-amber-900/70 transition hover:bg-amber-100 hover:text-amber-950 dark:border-amber-500/30 dark:bg-amber-500/5 dark:text-amber-100/70 dark:hover:bg-amber-500/20 dark:hover:text-amber-50"
                   style={{ top, height, left: `calc(${(lane / n) * 100}% + 2px)`, width: `calc(${100 / n}% - 4px)` }} onClick={(e) => { e.stopPropagation(); onEdit(t); }}>
                   <span className="absolute inset-y-0 left-0 w-1 bg-amber-400/60" />
                   <div className="py-1 pl-3 pr-2">
@@ -397,7 +403,7 @@ function WeekView({ stats, today, onOpen, onToggle, onEdit, onNew, onMove }: Wee
                 <div className={`text-[11px] font-semibold uppercase tracking-wider ${isToday ? "text-brand-600" : "text-slate-400"}`}>{weekday(s.date)}</div>
                 <div className={`text-xl font-bold leading-none ${isToday ? "text-brand-600" : "text-slate-900 dark:text-white"}`}>{Number(s.date.slice(8))}</div>
               </button>
-              <button className="icon-btn !size-6 hover:!text-brand-600" aria-label={`Add task on ${longDay(s.date)}`} onClick={() => onNew(s.date)}><Plus size={14} /></button>
+              {!(state.lockPastDays && s.date < today) && <button className="icon-btn !size-6 hover:!text-brand-600" aria-label={`Add task on ${longDay(s.date)}`} onClick={() => onNew(s.date)}><Plus size={14} /></button>}
             </div>
             <div className="mb-2 h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-white/10" aria-hidden>
               <div className={`h-full rounded-full ${s.date < today && (s.completion ?? 1) < 1 ? "bg-amber-500" : "bg-emerald-500"}`} style={{ width: `${(s.completion ?? 0) * 100}%` }} />
@@ -420,7 +426,7 @@ function WeekView({ stats, today, onOpen, onToggle, onEdit, onNew, onMove }: Wee
                 );
               })}
               {missedOn(state, s.date).map(({ task: t, slot }) => (
-                <button key={`ghost-${t.id}`} onClick={() => onEdit(t)} className="block w-full cursor-pointer rounded-lg border border-dashed border-amber-300 bg-amber-50/50 px-1.5 py-1 text-left text-xs text-amber-900/70 dark:border-amber-500/30 dark:bg-amber-500/5 dark:text-amber-100/70">
+                <button key={`ghost-${t.id}`} onClick={() => onEdit(t)} className="block w-full cursor-pointer rounded-lg border border-dashed border-amber-300 bg-amber-50/50 px-1.5 py-1 text-left text-xs text-amber-900/70 dark:border-amber-500/30 dark:bg-amber-500/5 dark:text-amber-100/70 hover:bg-amber-100 dark:hover:bg-amber-500/20">
                   <div className="truncate font-medium">{t.title}</div>
                   <div className="text-[10px]">{slot.start ? `${clock12(slot.start)} · ` : ""}not finished · moved on</div>
                 </button>

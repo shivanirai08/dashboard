@@ -6,6 +6,7 @@ import MistakeSheet from "../components/MistakeSheet";
 import { ReasonBreakdown, SubjectMatrix } from "../components/Analysis";
 import { marksOf } from "../lib/reasons";
 import { Empty } from "../components/ui";
+import { fmtDur } from "../lib/schedule";
 import type { MockAttempt } from "../lib/types";
 
 export default function MockDetail() {
@@ -37,7 +38,7 @@ export default function MockDetail() {
       <div>
         <Link to="/mocks" className="mb-2 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-brand-600"><ArrowLeft size={14} />All mocks</Link>
         <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">{mock.name}</h1>
-        <p className="mt-1 text-sm text-slate-500">{formatDate(mock.date)} · {mock.source || "—"} · {mock.type === "custom" ? `Custom (${mock.subjects?.join(", ") || "no subjects"})` : "Full mock"}{mock.timeMin ? ` · ${mock.timeMin} min` : ""}</p>
+        <p className="mt-1 text-sm text-slate-500">{formatDate(mock.date)} · {mock.source || "—"} · {mock.type === "test" ? `Test (${mock.subjects?.join(", ") || "no subject"})` : mock.type === "custom" ? `Custom (${mock.subjects?.join(", ") || "no subjects"})` : "Full mock"}{mock.timeMin ? ` · ${fmtDur(mock.timeMin)}` : ""}</p>
       </div>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-5">

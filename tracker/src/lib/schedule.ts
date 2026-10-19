@@ -20,7 +20,24 @@ export const clock12 = (hhmm: string) => {
   return `${h % 12 || 12}${m ? `:${String(m).padStart(2, "0")}` : ""} ${h < 12 || h === 24 ? "am" : "pm"}`;
 };
 
-export const fmtDur = (min: number) => (min >= 60 ? `${Math.floor(min / 60)}h${min % 60 ? ` ${min % 60}m` : ""}` : `${min}m`);
+/** Input notation only: hours.minutes, 165 min → "2.45", 30 min → "0.30". */
+export const fmtHM = (min: number) => {
+  const t = Math.max(0, Math.round(min));
+  return `${Math.floor(t / 60)}.${String(t % 60).padStart(2, "0")}`;
+};
+/** Shown in the UI with both parts: 165 min → "2h 45m", 30 min → "0h 30m". */
+export const fmtDur = (min: number) => {
+  const t = Math.max(0, Math.round(min));
+  return `${Math.floor(t / 60)}h ${String(t % 60).padStart(2, "0")}m`;
+};
+
+/** Reads "2.45" as 2 h 45 min and "0.30" as 30 min (a lone digit is tens: "2.5" = 2.50). Minutes must be under 60. */
+export function parseHM(text: string): number | undefined {
+  const m = text.trim().replace(",", ".").match(/^(\d*)(?:\.(\d{0,2}))?$/);
+  if (!m || (!m[1] && !m[2])) return undefined;
+  const mins = Number((m[2] ?? "").padEnd(2, "0"));
+  return mins < 60 ? Number(m[1] || 0) * 60 + mins : undefined;
+}
 
 export const weekdayOf = (iso: string) => new Date(`${iso}T12:00:00`).getDay();
 

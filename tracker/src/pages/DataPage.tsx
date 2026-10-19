@@ -2,7 +2,7 @@ import { useRef } from "react";
 import { Cloud, Download, Upload } from "lucide-react";
 import { useStore } from "../lib/store";
 import { supabaseConfigured } from "../lib/supabase";
-import { PageHeader } from "../components/ui";
+import { HoursInput, PageHeader } from "../components/ui";
 
 export default function DataPage() {
   const { state, setState, exportJson, importJson, resetProgress, sync } = useStore();
@@ -25,8 +25,19 @@ export default function DataPage() {
           <div className="card-title">Goals</div>
           <div className="flex flex-wrap gap-4">
             <label><span className="label">Exam date</span><input className="input !w-48" type="date" value={state.examDate ?? ""} onChange={(e) => setState((s) => ({ ...s, examDate: e.target.value || undefined }))} /></label>
-            <label><span className="label">Daily focus goal (hours)</span><input className="input !w-48" type="number" min={0} step={0.5} value={(state.dailyGoalMin ?? 240) / 60} onChange={(e) => setState((s) => ({ ...s, dailyGoalMin: Math.round(Number(e.target.value) * 60) }))} /></label>
+            <label><span className="label">Daily focus goal (hours.min)</span><HoursInput className="input !w-48" minutes={state.dailyGoalMin ?? 240} onChange={(m) => setState((s) => ({ ...s, dailyGoalMin: m || undefined }))} /></label>
           </div>
+        </div>
+
+        <div className="card">
+          <div className="card-title">Schedule</div>
+          <label className="flex cursor-pointer items-start gap-3">
+            <input type="checkbox" className="mt-1 size-4 accent-indigo-600" checked={!!state.lockPastDays} onChange={(e) => setState((s) => ({ ...s, lockPastDays: e.target.checked || undefined }))} />
+            <span>
+              <span className="block text-sm font-medium text-slate-900 dark:text-white">Lock past days</span>
+              <span className="block text-xs text-slate-500">No new tasks on days that are already gone. You can still edit, mark done and add notes to what’s there.</span>
+            </span>
+          </label>
         </div>
 
         <div className="card">

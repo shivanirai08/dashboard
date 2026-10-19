@@ -42,7 +42,7 @@ export default function Dashboard() {
   const hour = new Date().getHours();
   const tiles = [
     { label: "Tasks today", value: planToday.length ? `${tasksDone}/${planToday.length}` : "0", to: "/schedule", tone: "from-emerald-500 to-teal-500", icon: ListTodo },
-    { label: "Focus today", value: `${todayMin}m`, sub: `goal ${goal}m`, to: "/schedule", tone: "from-indigo-500 to-violet-500", icon: Clock },
+    { label: "Focus today", value: fmtDur(todayMin), sub: `goal ${fmtDur(goal)}`, to: "/schedule", tone: "from-indigo-500 to-violet-500", icon: Clock },
     { label: "Revisions due", value: dueRev.length, to: "/revision", tone: "from-amber-500 to-orange-500", icon: RotateCcw },
     { label: "Open mistakes", value: openMistakes, to: "/mistakes", tone: "from-rose-500 to-pink-500", icon: TriangleAlert },
   ];
@@ -78,7 +78,7 @@ export default function Dashboard() {
                 <ResponsiveContainer width="100%" height={170}>
                   <BarChart data={series}>
                     <XAxis dataKey="day" fontSize={10} tickLine={false} axisLine={false} interval={1} />
-                    <Tooltip cursor={{ fill: "rgba(99,102,241,.08)" }} />
+                    <Tooltip cursor={{ fill: "rgba(99,102,241,.08)" }} formatter={(v) => [fmtDur(Number(v)), "Focus"]} />
                     <Bar dataKey="min" fill="#6366f1" radius={[6, 6, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
@@ -250,7 +250,7 @@ function FocusNow() {
       )}
       {!p.taskId && <p className="mt-1.5 text-xs text-slate-400">Extra sessions only show in today’s session log; they don’t count toward any task.</p>}
       <div className="mt-3">
-        <div className="mb-1 flex justify-between text-xs text-slate-500"><span>Daily goal</span><span>{logged + live} / {goal} min{onTasks > 0 && ` · ${onTasks} on tasks`}</span></div>
+        <div className="mb-1 flex justify-between text-xs text-slate-500"><span>Daily goal</span><span>{fmtDur(logged + live)} / {fmtDur(goal)}{onTasks > 0 && ` · ${fmtDur(onTasks)} on tasks`}</span></div>
         <div className="h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-white/10"><div className="h-full rounded-full bg-gradient-to-r from-brand-500 to-violet-500 transition-all" style={{ width: `${pct}%` }} /></div>
       </div>
     </div>
