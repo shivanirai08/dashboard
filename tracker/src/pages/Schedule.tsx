@@ -183,13 +183,13 @@ function DayView({ date, today, now, stats, backlog, onEdit, onNew, onToggle }: 
   const timedIds = new Set(timed.map((t) => t.id));
   // carried-over, multi-day and untimed tasks have no slot of their own today
   const strip = stats.tasks.filter((t) => !timedIds.has(t.id));
-  const startH = Math.min(6, ...timed.map((t) => Math.floor(toMin(t.start!) / 60)));
-  const hours = Array.from({ length: END_H - startH }, (_, i) => startH + i);
   // faded copies of tasks that were left unfinished on this day and moved on
   const ghosts = missedOn(state, date);
   const ghostTimed = ghosts.filter((g) => g.slot.start && g.slot.end);
   const ghostStrip = ghosts.filter((g) => !(g.slot.start && g.slot.end));
-  const lanes = layoutLanes([...timed, ...ghostTimed.map((g) => ({ id: `ghost-${g.task.id}`, start: g.slot.start, end: g.slot.end }))]);
+  const startH = Math.min(6, ...timed.map((t) => Math.floor(toMin(t.start!) / 60)), ...ghostTimed.map((g) => Math.floor(toMin(g.slot.start!) / 60)));
+  const hours = Array.from({ length: END_H - startH }, (_, i) => startH + i);
+  const lanes = layoutLanes([...timed, ...ghostTimed.map((g) => ({ id: `ghost-${g.task.id}`, start: g.slot.start, end: g.slot.end }))].sort((a, b) => a.start!.localeCompare(b.start!)));
   const isToday = date === today;
   const past = date < today;
   const nowMin = now.getHours() * 60 + now.getMinutes();
@@ -198,7 +198,8 @@ function DayView({ date, today, now, stats, backlog, onEdit, onNew, onToggle }: 
   useEffect(() => {
     const el = scroller.current;
     if (!el) return;
-    const focusMin = isToday ? nowMin - 60 : timed.length ? toMin(timed[0].start!) - 30 : 8 * 60;
+    const firstMin = Math.min(...timed.map((t) => toMin(t.start!)), ...ghostTimed.map((g) => toMin(g.slot.start!)));
+    const focusMin = isToday ? nowMin - 60 : Number.isFinite(firstMin) ? firstMin - 30 : 8 * 60;
     el.scrollTop = Math.max(0, ((focusMin - startH * 60) / 60) * HOUR_PX);
   }, [date]); // eslint-disable-line react-hooks/exhaustive-deps
 
