@@ -131,6 +131,28 @@ export function useTasks() {
     setStatus(t.id, "todo");
   }, [setStatus, update, reschedule]);
 
+  /** Undo "Move to today": put an overdue task back on the day it was last missed on. */
+  const putBack = useCallback((id: string): string | undefined => {
+    const t = ref.current.todos.find((x) => x.id === id);
+    const last = t?.missed?.[t.missed.length - 1];
+    if (!t || !last) return undefined;
+    setState((s) => ({
+      ...s,
+      todos: s.todos.map((x) => {
+        if (x.id !== id) return x;
+        const rest = x.missed!.slice(0, -1);
+        const { missed: _m, start: _s, end: _e, due: _d, ...keep } = x;
+        const next: TodoItem = { ...keep, planned: last.date };
+        if (last.start) next.start = last.start;
+        if (last.end) next.end = last.end;
+        if (last.due) next.due = last.due;
+        if (rest.length) next.missed = rest;
+        return next;
+      }),
+    }));
+    return last.date;
+  }, [setState]);
+
   const patchNotes = useCallback((id: string, fn: (notes: TaskNote[]) => TaskNote[]) => {
     setState((s) => ({ ...s, todos: s.todos.map((t) => {
       if (t.id !== id) return t;
@@ -149,5 +171,5 @@ export function useTasks() {
   }, [patchNotes]);
   const deleteNote = useCallback((id: string, noteId: string) => patchNotes(id, (n) => n.filter((x) => x.id !== noteId)), [patchNotes]);
 
-  return { create, update, setStatus, toggleDone, reschedule, moveTo, review, addNote, editNote, deleteNote };
+  return { create, update, setStatus, toggleDone, reschedule, moveTo, review, putBack, addNote, editNote, deleteNote };
 }

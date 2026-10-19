@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { AlertCircle, CalendarDays, Check, ChevronLeft, ChevronRight, Clock, Inbox, KanbanSquare, Plus, Repeat, Target } from "lucide-react";
+import { AlertCircle, CalendarDays, Check, ChevronLeft, ChevronRight, Clock, Inbox, KanbanSquare, Plus, Repeat, Target, Undo2 } from "lucide-react";
 import { useStore } from "../lib/store";
 import { useToast } from "../components/Toast";
 import { useRemove } from "../lib/undo";
@@ -13,8 +13,8 @@ import TaskDialog, { type TaskDraft } from "../components/TaskDialog";
 import TaskBoard, { DRAG_TASK } from "../components/TaskBoard";
 import PlayButton from "../components/PlayButton";
 import { clock12, dayStats, fmtDur, fromMin, layoutLanes, monthDates, toMin, weekDates, weekStartOf, type DayStats } from "../lib/schedule";
-import { columnOf, dayCounter, missedOn, overdueDay, phaseOf, plannedMin, tasksBetween } from "../lib/tasks";
-import type { TodoItem } from "../lib/types";
+import { columnOf, dayCounter, focusOn, missedOn, overdueDay, phaseOf, plannedMin, tasksBetween } from "../lib/tasks";
+import type { AppState, TodoItem } from "../lib/types";
 
 type Range = "day" | "week" | "month";
 type View = "calendar" | "board";
@@ -40,6 +40,12 @@ function pref<T extends string>(key: string, allowed: readonly T[], fallback: T)
 }
 function savePref(key: string, v: string) {
   try { localStorage.setItem(key, v); } catch { /* ignore */ }
+}
+
+/** "not finished" on the first missed day, then "overdue day N", plus what was focused that day */
+function ghostLabel(state: AppState, id: string, date: string, day: number) {
+  const m = focusOn(state, id, date);
+  return `${day === 0 ? "not finished" : `overdue day ${day}`}${m ? ` · ${fmtDur(m)} focused` : ""}`;
 }
 
 /** emerald = done, amber = date passed & unfinished, indigo = still to come */
@@ -170,7 +176,8 @@ type DayProps = {
 
 function DayView({ date, today, now, stats, backlog, onEdit, onNew, onToggle }: DayProps) {
   const { state } = useStore();
-  const { reschedule } = useTasks();
+  const { reschedule, putBack } = useTasks();
+  const toast = useToast();
   const scroller = useRef<HTMLDivElement>(null);
   const timed = stats.timed;
   const timedIds = new Set(timed.map((t) => t.id));
@@ -226,10 +233,10 @@ function DayView({ date, today, now, stats, backlog, onEdit, onNew, onToggle }: 
           <div className="border-b border-slate-100 px-4 py-2.5 dark:border-white/[.06]">
             <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">In progress · carried over</div>
             <div className="flex flex-wrap gap-2">
-              {ghostStrip.map(({ task: t }) => (
+              {ghostStrip.map(({ task: t, day }) => (
                 <div key={`ghost-${t.id}`} className="flex max-w-full items-center gap-2 rounded-lg border border-dashed border-amber-300 bg-amber-50/50 px-2 py-1 text-sm text-amber-900/70 dark:border-amber-500/30 dark:bg-amber-500/5 dark:text-amber-100/70">
                   <button className="min-w-0 cursor-pointer truncate text-left font-medium" onClick={() => onEdit(t)}>{t.title}</button>
-                  <span className="shrink-0 text-[11px] font-semibold">not finished · moved to {shortDay(t.planned ?? today)}</span>
+                  <span className="shrink-0 text-[11px] font-semibold">{ghostLabel(state, t.id, date, day)}</span>
                 </div>
               ))}
               {strip.map((t) => {
@@ -267,7 +274,7 @@ function DayView({ date, today, now, stats, backlog, onEdit, onNew, onToggle }: 
               </div>
             )}
 
-            {ghostTimed.map(({ task: t, slot }) => {
+            {ghostTimed.map(({ task: t, slot, day }) => {
               const { lane, lanes: n } = lanes.get(`ghost-${t.id}`) ?? { lane: 0, lanes: 1 };
               const top = ((toMin(slot.start!) - startH * 60) / 60) * HOUR_PX;
               const height = Math.max(24, ((toMin(slot.end!) - toMin(slot.start!)) / 60) * HOUR_PX - 2);
@@ -277,7 +284,7 @@ function DayView({ date, today, now, stats, backlog, onEdit, onNew, onToggle }: 
                   <span className="absolute inset-y-0 left-0 w-1 bg-amber-400/60" />
                   <div className="py-1 pl-3 pr-2">
                     <div className="truncate text-sm font-semibold leading-tight">{t.title}</div>
-                    {height >= 44 && <div className="truncate text-[11px]">{clock12(slot.start!)} – {clock12(slot.end!)} · not finished{t.planned ? ` · moved to ${shortDay(t.planned)}` : ""}</div>}
+                    {height >= 44 && <div className="truncate text-[11px]">{clock12(slot.start!)} – {clock12(slot.end!)} · {ghostLabel(state, t.id, date, day)}</div>}
                   </div>
                 </div>
               );
@@ -308,6 +315,8 @@ function DayView({ date, today, now, stats, backlog, onEdit, onNew, onToggle }: 
                         </div>
                       )}
                     </button>
+                    {!done && !!t.missed?.length && <button type="button" className="icon-btn !size-6 shrink-0" title="Remove from today — put it back on the day it was missed" aria-label={`Remove “${t.title}” from today`}
+                      onClick={(e) => { e.stopPropagation(); const d = putBack(t.id); if (d) toast(`Put back on ${shortDay(d)}`); }}><Undo2 size={13} /></button>}
                     <NotesButton task={t} className="!size-6" />
                     <PlayButton task={t} className="!size-6" />
                   </div>
@@ -425,10 +434,10 @@ function WeekView({ stats, today, onOpen, onToggle, onEdit, onNew, onMove }: Wee
                   </div>
                 );
               })}
-              {missedOn(state, s.date).map(({ task: t, slot }) => (
+              {missedOn(state, s.date).map(({ task: t, slot, day }) => (
                 <button key={`ghost-${t.id}`} onClick={() => onEdit(t)} className="block w-full cursor-pointer rounded-lg border border-dashed border-amber-300 bg-amber-50/50 px-1.5 py-1 text-left text-xs text-amber-900/70 dark:border-amber-500/30 dark:bg-amber-500/5 dark:text-amber-100/70 hover:bg-amber-100 dark:hover:bg-amber-500/20">
                   <div className="truncate font-medium">{t.title}</div>
-                  <div className="text-[10px]">{slot.start ? `${clock12(slot.start)} · ` : ""}not finished · moved on</div>
+                  <div className="text-[10px]">{slot.start ? `${clock12(slot.start)} · ` : ""}{ghostLabel(state, t.id, s.date, day)}</div>
                 </button>
               ))}
             </div>

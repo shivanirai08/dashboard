@@ -1,4 +1,4 @@
-import { todayISO } from "./dates";
+import { addDays, isSameDay, todayISO } from "./dates";
 import type { AppState, TodoItem } from "./types";
 
 /**
@@ -79,12 +79,34 @@ export const daysBetween = (from: string, to: string) =>
 export function missPatch(t: TodoItem, newDate: string, today = todayISO()): Pick<TodoItem, "missed"> | undefined {
   if (t.status === "done" || !t.planned || phaseOf(t, today) !== "overdue" || newDate < today || newDate <= t.planned) return undefined;
   if (t.missed?.some((m) => m.date === t.planned)) return undefined;
-  return { missed: [...(t.missed ?? []), { date: t.planned, start: t.start, end: t.end }] };
+  return { missed: [...(t.missed ?? []), { date: t.planned, start: t.start, end: t.end, due: t.due }] };
 }
 
-/** Faded copies shown on days where a task was missed (it has since moved to another day). */
+/**
+ * Faded copies shown on every day a task sat unfinished: from the day it was first missed up to the day before
+ * its current one. `day` is 0 on the first missed day, then 1, 2 … ("overdue day N").
+ */
 export const missedOn = (state: AppState, date: string) =>
-  state.todos.flatMap((t) => (t.planned === date ? [] : (t.missed ?? []).filter((m) => m.date === date).map((slot) => ({ task: t, slot }))));
+  state.todos.flatMap((t) => {
+    const first = t.missed?.[0];
+    if (!first || !t.planned || date < first.date || date >= t.planned || (t.doneAt && date > t.doneAt)) return [];
+    const slot = [...t.missed!].reverse().find((m) => m.date <= date) ?? first;
+    return [{ task: t, slot, day: daysBetween(first.date, date) }];
+  });
+
+/** Focus minutes logged against a task on one day */
+export const focusOn = (state: AppState, taskId: string, date: string) =>
+  state.pomodoros.filter((p) => p.kind === "focus" && p.taskId === taskId && isSameDay(p.startedAt, date)).reduce((a, p) => a + p.minutes, 0);
+
+/** Day-by-day time contribution from the first day (first missed day, else its planned day) up to today / when it was done */
+export function dailyContribution(state: AppState, t: TodoItem, today = todayISO()) {
+  const first = t.missed?.[0]?.date ?? t.planned;
+  if (!first) return [];
+  const last = t.doneAt && t.doneAt < today ? t.doneAt : today;
+  const rows: { date: string; day: number; min: number }[] = [];
+  for (let d = first, i = 1; d <= last && i <= 120; d = addDays(d, 1), i++) rows.push({ date: d, day: i, min: focusOn(state, t.id, d) });
+  return rows;
+}
 
 /** "Overdue day 2": days since it was first missed, for unfinished tasks that have been carried over */
 export function overdueDay(t: TodoItem, today = todayISO()): number | null {

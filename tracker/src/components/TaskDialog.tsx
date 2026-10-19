@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { CalendarClock, Inbox, ListTodo, Play, Repeat, Trash2, X } from "lucide-react";
+import { CalendarClock, Inbox, ListTodo, Play, Repeat, Trash2, Undo2, X } from "lucide-react";
 import { useStore } from "../lib/store";
 import { addDays, todayISO } from "../lib/dates";
 import { uid } from "../lib/ids";
 import { useTasks } from "../lib/useTasks";
 import { fmtDur, fromMin, nowHM, toMin } from "../lib/schedule";
+import { dailyContribution } from "../lib/tasks";
+import { formatDate } from "../lib/dates";
 import { Field, HoursInput } from "./ui";
 import SubjectPicker from "./SubjectPicker";
 import { usePomodoro } from "../lib/pomodoro";
@@ -20,7 +22,7 @@ export type TaskDraft = Partial<TodoItem> & { title?: string };
  */
 export default function TaskDialog({ draft, onClose, onDelete }: { draft: TaskDraft; onClose: () => void; onDelete: (t: TodoItem) => void }) {
   const { catalog, state } = useStore();
-  const { create, update, setStatus: setTaskStatus } = useTasks();
+  const { create, update, setStatus: setTaskStatus, putBack } = useTasks();
   const p = usePomodoro();
   const isNew = !draft.id;
   const [title, setTitle] = useState(draft.title ?? "");
@@ -165,9 +167,33 @@ export default function TaskDialog({ draft, onClose, onDelete }: { draft: TaskDr
           </div>
         )}
 
+        {!isNew && (() => {
+          const rows = dailyContribution(state, draft as TodoItem);
+          const total = rows.reduce((a, r) => a + r.min, 0);
+          if (rows.length < 2 && !total) return null;
+          return (
+            <div>
+              <span className="label">Time by day</span>
+              <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200 text-sm dark:divide-white/[.06] dark:border-white/10">
+                {rows.map((r) => (
+                  <li key={r.date} className="flex items-center gap-2 px-3 py-1.5">
+                    <span className="chip bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-slate-300">Day {r.day}</span>
+                    <span className="text-slate-500">{formatDate(r.date)}</span>
+                    <span className={`ml-auto tabular-nums ${r.min ? "font-medium text-slate-900 dark:text-white" : "text-slate-400"}`}>{r.min ? fmtDur(r.min) : "–"}</span>
+                  </li>
+                ))}
+                <li className="flex items-center px-3 py-1.5 text-xs font-semibold text-slate-500"><span>Total focused</span><span className="ml-auto tabular-nums">{fmtDur(total)}</span></li>
+              </ul>
+            </div>
+          );
+        })()}
+
         {err && <div role="alert" className="text-sm text-rose-600">{err}</div>}
         <div className="flex items-center gap-2 pt-1">
           {!isNew && <button type="button" className="btn-ghost !text-rose-600" onClick={() => onDelete(draft as TodoItem)}><Trash2 size={15} />Delete</button>}
+          {!isNew && status !== "done" && !!draft.missed?.length && (
+            <button type="button" className="btn-ghost" title="Put it back on the day it was missed" onClick={() => { putBack(draft.id!); onClose(); }}><Undo2 size={14} />Remove from today</button>
+          )}
           {!isNew && status !== "done" && (
             <button type="button" className="btn-ghost" onClick={() => { p.focusOnTask(draft.id!, title.trim() || draft.title || "", subjects.join(", ") || undefined); onClose(); }}><Play size={14} />Start focus</button>
           )}

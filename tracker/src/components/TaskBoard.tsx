@@ -35,7 +35,7 @@ type Props = { tasks: TodoItem[]; onEdit: (t: TodoItem) => void; onDelete: (t: T
 export default function TaskBoard({ tasks, onEdit, onDelete }: Props) {
   const { state } = useStore();
   const toast = useToast();
-  const { moveTo, toggleDone, reschedule, review } = useTasks();
+  const { moveTo, toggleDone, reschedule, review, putBack } = useTasks();
   const today = todayISO();
   const [over, setOver] = useState<Column | null>(null);
 
@@ -115,6 +115,7 @@ export default function TaskBoard({ tasks, onEdit, onDelete }: Props) {
                           <button className="chip cursor-pointer border border-slate-200 hover:bg-slate-100 dark:border-white/10 dark:hover:bg-white/10" onClick={() => review(t.id, false)}>Forgot</button>
                         </>
                       )}
+                      {!done && !!t.missed?.length && <button className="chip cursor-pointer border border-rose-200 text-rose-600 hover:bg-rose-50 dark:border-rose-500/30 dark:hover:bg-rose-500/10" title="Put it back on the day it was missed" onClick={() => { const d = putBack(t.id); if (d) toast(`“${t.title}” put back on ${formatDate(d)}`); }}>Remove from today</button>}
                       {phase === "overdue" && <button className="chip cursor-pointer border border-rose-200 text-rose-600 hover:bg-rose-50 dark:border-rose-500/30 dark:hover:bg-rose-500/10" onClick={() => reschedule(t.id, today)}>Move to today</button>}
                       <select aria-label={`Status of “${t.title}”`} className="ml-auto cursor-pointer rounded-md border border-slate-200 bg-transparent px-1.5 py-0.5 text-xs text-slate-500 dark:border-white/10" value={col.key} onChange={(e) => move(t, e.target.value as Column)}>
                         {COLS.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}

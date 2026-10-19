@@ -93,7 +93,7 @@ export type TodoItem = {
   extensions?: number;
   originalDue?: string;
   /** days this task was left unfinished and then moved on; each stays on its original day as a faded copy */
-  missed?: { date: string; start?: string; end?: string }[];
+  missed?: { date: string; start?: string; end?: string; due?: string }[];
   /** free-form notes the user jots down against this task (separate from the edit dialog) */
   notes?: TaskNote[];
   /** total minutes logged against this task */
