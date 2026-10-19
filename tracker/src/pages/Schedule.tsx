@@ -246,7 +246,7 @@ function DayView({ date, today, now, stats, backlog, onEdit, onNew, onToggle }: 
                   <div key={t.id} {...dragProps(t.id)} className={`flex max-w-full items-center gap-2 rounded-lg border px-2 py-1 text-sm ${late ? "border-rose-300 bg-rose-50 text-rose-900 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-100" : tone(t, today).box}`}>
                     <input type="checkbox" className="size-4 shrink-0 cursor-pointer accent-emerald-600" checked={t.status === "done"} onChange={() => onToggle(t)} aria-label={`Mark “${t.title}” ${t.status === "done" ? "not done" : "done"}`} />
                     <button className={`min-w-0 cursor-pointer truncate text-left font-medium ${t.status === "done" ? "line-through opacity-70" : ""}`} onClick={() => onEdit(t)}>{t.revision && <Repeat size={12} className="mr-1 inline" aria-label="Revision" />}{t.title}</button>
-                    {late && <span className="shrink-0 text-[11px] font-semibold">{-daysUntil(t.due ?? t.planned ?? today)}d overdue</span>}
+                    {late && !overdueDay(t, today) && <span className="shrink-0 text-[11px] font-semibold">{-daysUntil(t.due ?? t.planned ?? today)}d overdue</span>}
                     {counter && <span className="shrink-0 text-[11px] opacity-70">{counter}</span>}
                     {overdueDay(t, today) && <span className="shrink-0 rounded bg-rose-100 px-1 text-[11px] font-semibold text-rose-700 dark:bg-rose-500/20 dark:text-rose-200">Overdue day {overdueDay(t, today)}</span>}
                     {late && isToday && <button className="shrink-0 cursor-pointer text-[11px] font-semibold underline-offset-2 hover:underline" onClick={() => reschedule(t.id, today)}>Move to today</button>}
@@ -482,6 +482,9 @@ function MonthView({ stats, month, today, onOpen, onEdit, onMove }: { stats: Day
                   const c = tone(t, today);
                   return <div key={t.id} {...dragProps(t.id)} onClick={(e) => { e.stopPropagation(); onEdit(t); }} className={`cursor-grab truncate rounded border-l-2 px-1 text-[10px] leading-4 ${c.box} ${c.bar.replace("bg-", "border-l-")} ${t.status === "done" ? "line-through opacity-70" : ""}`}>{t.title}</div>;
                 })}
+                {missedOn(state, d).slice(0, Math.max(0, 3 - items.length)).map(({ task: t }) => (
+                  <div key={`ghost-${t.id}`} onClick={(e) => { e.stopPropagation(); onEdit(t); }} className="cursor-pointer truncate rounded border border-dashed border-amber-300 bg-amber-50/50 px-1 text-[10px] leading-4 text-amber-900/70 hover:bg-amber-100 dark:border-amber-500/30 dark:bg-amber-500/5 dark:text-amber-100/70 dark:hover:bg-amber-500/20" title="Not finished — moved on">{t.title}</div>
+                ))}
                 {items.length > 3 && <div className="px-1 text-[10px] text-slate-400">+{items.length - 3} more</div>}
               </div>
               {s.tasks.length > 0 && (

@@ -87,7 +87,7 @@ export default function TaskBoard({ tasks, onEdit, onDelete }: Props) {
                       <span className={`chip ${PRIO[t.priority ?? "med"]}`}>{PRIO_LABEL[t.priority ?? "med"]}</span>
                       {t.subjects?.map((x) => <span key={x} className={`chip ${subjectTone(x)}`}>{x}</span>)}
                       {t.revision && <span className="chip bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300"><Repeat size={11} className="mr-1" />every {t.revision.intervalDays}d</span>}
-                      {phase === "overdue" && <span className="chip bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300">{-daysUntil(t.due ?? t.planned ?? today)}d overdue</span>}
+                      {phase === "overdue" && !overdueDay(t, today) && <span className="chip bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300">{-daysUntil(t.due ?? t.planned ?? today)}d overdue</span>}
                       {overdueDay(t, today) && <span className="chip bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300">Overdue day {overdueDay(t, today)}</span>}
                       {counter && <span className="chip bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300">{counter}</span>}
                     </div>
