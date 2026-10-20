@@ -10,6 +10,10 @@ export type MockAttempt = {
   source: string;
   /** full mock, custom mock over chosen subjects, or a short subject test (1–2 subjects) */
   type?: "full" | "custom" | "test";
+  /** subject tests: the topics covered (empty when `wholeSubject`) */
+  topics?: string[];
+  /** subject tests: the whole subject rather than specific topics */
+  wholeSubject?: boolean;
   subjects?: string[];
   date: string;
   score: number;

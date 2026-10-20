@@ -15,7 +15,7 @@ import { useTheme } from "./lib/theme";
 const links = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
   { to: "/schedule", label: "Schedule & Tasks", icon: CalendarDays },
-  { to: "/mocks", label: "Mock Analysis", icon: LineChart },
+  { to: "/mocks", label: "Mocks & Tests", icon: LineChart },
   { to: "/mistakes", label: "Mistake Log", icon: TriangleAlert },
   { to: "/revision", label: "Revision", icon: RotateCcw },
   { to: "/data", label: "Settings & Sync", icon: Settings },

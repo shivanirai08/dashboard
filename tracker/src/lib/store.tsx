@@ -25,7 +25,9 @@ function normalize(raw: AppState): AppState {
     const { subject, ...rest } = t;
     return { ...rest, subjects: t.subjects ?? (subject ? [subject] : undefined), status: t.status ?? (legacy.done ? "done" : "todo") } as AppState["todos"][number];
   });
-  return { ...empty, ...raw, todos: migrateRevisions(raw.revisions, migrateBlocks(raw.schedule, todos)), revisions: [], schedule: undefined };
+  // a "test" is one subject; an earlier multi-subject test is really a custom mock
+  const mocks = (raw.mocks ?? []).map((m) => (m.type === "test" && (m.subjects?.length ?? 0) > 1 ? { ...m, type: "custom" as const } : m));
+  return { ...empty, ...raw, mocks, todos: migrateRevisions(raw.revisions, migrateBlocks(raw.schedule, todos)), revisions: [], schedule: undefined };
 }
 
 // revision topics are tasks too: one due day each, repeated on a growing interval

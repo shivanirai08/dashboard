@@ -36,9 +36,9 @@ export default function MockDetail() {
   return (
     <div className="space-y-5">
       <div>
-        <Link to="/mocks" className="mb-2 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-brand-600"><ArrowLeft size={14} />All mocks</Link>
+        <Link to={mock.type === "test" || mock.type === "custom" ? `/mocks?kind=${mock.type}` : "/mocks"} className="mb-2 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-brand-600"><ArrowLeft size={14} />{mock.type === "test" ? "All subject tests" : mock.type === "custom" ? "All custom mocks" : "All full mocks"}</Link>
         <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">{mock.name}</h1>
-        <p className="mt-1 text-sm text-slate-500">{formatDate(mock.date)} · {mock.source || "—"} · {mock.type === "test" ? `Test (${mock.subjects?.join(", ") || "no subject"})` : mock.type === "custom" ? `Custom (${mock.subjects?.join(", ") || "no subjects"})` : "Full mock"}{mock.timeMin ? ` · ${fmtDur(mock.timeMin)}` : ""}</p>
+        <p className="mt-1 text-sm text-slate-500">{formatDate(mock.date)} · {mock.source || "—"} · {mock.type === "test" ? `Test · ${mock.subjects?.[0] ?? "no subject"} · ${mock.wholeSubject || !mock.topics?.length ? "whole subject" : mock.topics.join(", ")}` : mock.type === "custom" ? `Custom (${mock.subjects?.join(", ") || "no subjects"})` : "Full mock"}{mock.timeMin ? ` · ${fmtDur(mock.timeMin)}` : ""}</p>
       </div>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
