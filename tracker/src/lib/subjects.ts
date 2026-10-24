@@ -10,8 +10,14 @@ const TONES = [
   "bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-300",
 ];
 
-export function subjectTone(name: string): string {
+// solid accents in the same order as TONES, for bars and dots
+const ACCENTS = ["bg-violet-500", "bg-sky-500", "bg-emerald-500", "bg-amber-500", "bg-rose-500", "bg-teal-500", "bg-fuchsia-500", "bg-orange-500"];
+
+function toneIndex(name: string): number {
   let h = 0;
   for (const c of name) h = (h * 31 + c.charCodeAt(0)) >>> 0;
-  return TONES[h % TONES.length];
+  return h % TONES.length;
 }
+
+export const subjectTone = (name: string): string => TONES[toneIndex(name)];
+export const subjectAccent = (name: string): string => ACCENTS[toneIndex(name)];

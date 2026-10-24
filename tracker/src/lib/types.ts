@@ -131,6 +131,18 @@ export type LegacyBlock = {
   done: boolean;
 };
 
+/** a pointer the user keeps under a subject: what to do next, something missed, anything */
+export type SubjectPoint = {
+  id: string;
+  subject: string;
+  text: string;
+  done: boolean;
+  /** pinned to the top of its panel */
+  starred?: boolean;
+  createdAt: string;
+  updatedAt?: string;
+};
+
 export type AppState = {
   mocks: MockAttempt[];
   mistakes: Mistake[];
@@ -145,6 +157,10 @@ export type AppState = {
   sessions?: string[];
   /** when on, no new tasks can be put on days that have already passed (existing ones can still be edited) */
   lockPastDays?: boolean;
+  /** the user's order of subject tabs on the Subject Notes page */
+  subjectOrder?: string[];
+  /** per-subject pointers shown on the Subject Notes page */
+  subjectPoints?: SubjectPoint[];
   /** daily focus goal in minutes */
   dailyGoalMin?: number;
 };

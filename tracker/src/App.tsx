@@ -1,10 +1,11 @@
 import { useEffect } from "react";
 import { Navigate, NavLink, Route, Routes, useNavigate } from "react-router-dom";
-import { CalendarDays, LayoutDashboard, LineChart, Moon, RotateCcw, Settings, Sun, TriangleAlert } from "lucide-react";
+import { CalendarDays, LayoutDashboard, LineChart, ListChecks, Moon, RotateCcw, Settings, Sun, TriangleAlert } from "lucide-react";
 import Dashboard from "./pages/Dashboard";
 import Mocks from "./pages/Mocks";
 import MockDetail from "./pages/MockDetail";
 import Mistakes from "./pages/Mistakes";
+import SubjectNotes from "./pages/SubjectNotes";
 import Revisions from "./pages/Revisions";
 import Schedule from "./pages/Schedule";
 import DataPage from "./pages/DataPage";
@@ -16,6 +17,7 @@ const links = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
   { to: "/schedule", label: "Schedule & Tasks", icon: CalendarDays },
   { to: "/mocks", label: "Mocks & Tests", icon: LineChart },
+  { to: "/notes", label: "Subject Notes", icon: ListChecks },
   { to: "/mistakes", label: "Mistake Log", icon: TriangleAlert },
   { to: "/revision", label: "Revision", icon: RotateCcw },
   { to: "/data", label: "Settings & Sync", icon: Settings },
@@ -92,6 +94,7 @@ export default function App() {
             <Route path="/schedule" element={<Schedule />} />
             <Route path="/mocks" element={<Mocks />} />
             <Route path="/mocks/:id" element={<MockDetail />} />
+            <Route path="/notes" element={<SubjectNotes />} />
             <Route path="/mistakes" element={<Mistakes />} />
             <Route path="/revision" element={<Revisions />} />
             <Route path="/focus" element={<Navigate to="/schedule" replace />} />
