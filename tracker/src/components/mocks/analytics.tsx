@@ -36,7 +36,7 @@ export function FullAnalytics({ mocks, subjects }: { mocks: MockAttempt[]; subje
                   <Bar dataKey="Correct" stackId="a" fill="#10b981" /><Bar dataKey="Wrong" stackId="a" fill="#f43f5e" /><Bar dataKey="Skipped" stackId="a" fill="#94a3b8" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
-            ) : <p className="py-10 text-center text-sm text-slate-400">Add correct / wrong counts to see this.</p>}
+            ) : <p className="py-10 text-center text-sm text-slate-500 dark:text-slate-400">Add correct / wrong counts to see this.</p>}
           </div>
           <div className="lg:col-span-2">
             <PctBars title="Weak subjects · how often tagged" color="#f43f5e" empty="Tag weak subjects when logging a mock."
@@ -98,7 +98,7 @@ export function TestAnalytics({ mocks }: { mocks: MockAttempt[] }) {
   return (
     <div className="min-w-0 space-y-5">
       <div className="flex flex-wrap items-center gap-2">
-        <label className="flex items-center gap-2 text-sm text-slate-500">Subject
+        <label className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">Subject
           <select className="input !w-auto" value={sel} onChange={(e) => setSubject(e.target.value)} disabled={!tested.length}>
             <option value="all">All subjects</option>
             {tested.map((s) => <option key={s} value={s}>{s}</option>)}

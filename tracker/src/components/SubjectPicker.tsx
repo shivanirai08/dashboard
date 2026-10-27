@@ -43,14 +43,14 @@ export default function SubjectPicker({ value, onChange, options }: { value: str
           onChange={(e) => { setQ(e.target.value); setOpen(true); setHi(0); }} onFocus={() => setOpen(true)} onBlur={() => setOpen(false)} onKeyDown={onKey} />
       </div>
       {open && (
-        <ul id={listId} role="listbox" aria-label="Subjects" className="absolute inset-x-0 top-full z-30 mt-1 max-h-48 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-lg dark:border-white/10 dark:bg-[#151a2a]">
+        <ul id={listId} role="listbox" aria-label="Subjects" className="absolute inset-x-0 top-full z-30 mt-1 max-h-48 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-lg dark:border-white/10 dark:bg-raised">
           {rest.map((o, i) => (
             <li key={o} role="option" aria-selected={i === hi} onMouseDown={(e) => { e.preventDefault(); pick(o); }} onMouseEnter={() => setHi(i)}
               className={`flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm ${i === hi ? "bg-brand-50 dark:bg-white/10" : ""}`}>
-              <Plus size={13} className="text-slate-400" /><span className={`chip ${subjectTone(o)}`}>{o}</span>
+              <Plus size={13} className="text-slate-500 dark:text-slate-400" /><span className={`chip ${subjectTone(o)}`}>{o}</span>
             </li>
           ))}
-          {!rest.length && <li className="px-2.5 py-2 text-sm text-slate-400">{value.length === options.length ? "All subjects added" : "No matching subject"}</li>}
+          {!rest.length && <li className="px-2.5 py-2 text-sm text-slate-500 dark:text-slate-400">{value.length === options.length ? "All subjects added" : "No matching subject"}</li>}
         </ul>
       )}
     </div>

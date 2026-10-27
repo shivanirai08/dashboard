@@ -48,16 +48,16 @@ export default function TaskNotesDialog({ taskId, onClose }: { taskId: string; o
   const add = () => { if (text.trim()) { addNote(taskId, text); setText(""); ref.current?.focus(); } };
   const saveEdit = () => { if (editing && editText.trim()) editNote(taskId, editing, editText); setEditing(null); };
   // Enter adds, Shift+Enter is a newline
-  const onEnter = (fn: () => void) => (e: React.KeyboardEvent) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); fn(); } };
+  const onEnter = (fn: () => void) => (e: React.KeyboardEvent) => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing && window.matchMedia("(hover: hover)").matches) { e.preventDefault(); fn(); } };
 
   return createPortal(
-    <div className="fixed inset-0 z-50 grid place-items-end bg-slate-900/50 p-0 backdrop-blur-sm sm:place-items-center sm:p-4"
+    <div className="fixed inset-0 z-50 grid place-items-end bg-slate-900/50 p-0 sm:place-items-center sm:p-4"
       onClick={(e) => e.stopPropagation()} onMouseDown={(e) => { e.stopPropagation(); if (e.target === e.currentTarget) onClose(); }}>
-      <div role="dialog" aria-modal="true" aria-labelledby="task-notes-title" className="card flex max-h-[85vh] w-full max-w-md flex-col gap-3 !rounded-b-none shadow-2xl sm:!rounded-b-2xl">
+      <div role="dialog" aria-modal="true" aria-labelledby="task-notes-title" className="card flex max-h-[85dvh] w-full max-w-md flex-col gap-3 !rounded-b-none shadow-2xl sm:!rounded-b-2xl">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <h2 id="task-notes-title" className="flex items-center gap-1.5 text-base font-semibold text-slate-900 dark:text-white"><StickyNote size={16} />Notes</h2>
-            <p className="truncate text-xs text-slate-500" title={task.title}>{task.title}</p>
+            <p className="truncate text-xs text-slate-500 dark:text-slate-400" title={task.title}>{task.title}</p>
           </div>
           <button type="button" className="icon-btn hover:!text-slate-700" aria-label="Close notes" onClick={onClose}><X size={16} /></button>
         </div>
@@ -81,16 +81,16 @@ export default function TaskNotesDialog({ taskId, onClose }: { taskId: string; o
               ) : (
                 <>
                   <p className="whitespace-pre-wrap break-words text-slate-800 dark:text-slate-100">{n.text}</p>
-                  <div className="mt-1.5 flex items-center gap-1 text-[11px] text-slate-400">
+                  <div className="mt-1.5 flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
                     <span>{stamp(n.createdAt)}{n.updatedAt && " · edited"}</span>
                     <button type="button" className="icon-btn ml-auto !size-6" aria-label="Edit note" onClick={() => { setEditing(n.id); setEditText(n.text); }}><Pencil size={12} /></button>
-                    <button type="button" className="icon-btn !size-6 hover:!text-rose-600" aria-label="Delete note" onClick={() => deleteNote(taskId, n.id)}><Trash2 size={12} /></button>
+                    <button type="button" className="icon-btn !size-6 hover:!text-rose-600 dark:text-rose-400" aria-label="Delete note" onClick={() => deleteNote(taskId, n.id)}><Trash2 size={12} /></button>
                   </div>
                 </>
               )}
             </li>
           ))}
-          {!notes.length && <li className="py-4 text-center text-xs text-slate-400">No notes yet. Add as many as you like.</li>}
+          {!notes.length && <li className="py-4 text-center text-xs text-slate-500 dark:text-slate-400">No notes yet. Add as many as you like.</li>}
         </ul>
       </div>
     </div>,

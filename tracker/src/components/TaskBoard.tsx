@@ -61,10 +61,10 @@ export default function TaskBoard({ tasks, onEdit, onDelete }: Props) {
               const t = state.todos.find((x) => x.id === e.dataTransfer.getData(DRAG_TASK));
               if (t) move(t, col.key);
             }}
-            className={`rounded-2xl p-3 transition ${over === col.key ? "bg-brand-50 ring-2 ring-brand-500/40 dark:bg-brand-500/10" : "bg-slate-200/50 dark:bg-white/[.03]"}`}>
+            className={`rounded-xl p-3 transition ${over === col.key ? "bg-brand-50 ring-2 ring-brand-500/40 dark:bg-brand-500/10" : "bg-slate-200/50 dark:bg-white/[.03]"}`}>
             <div className="mb-3 flex items-center gap-2 px-1 text-sm font-semibold text-slate-700 dark:text-slate-200">
               <span className={`size-2 rounded-full ${col.dot}`} />{col.label}
-              <span className="ml-auto text-xs font-normal text-slate-400">{list.length}</span>
+              <span className="ml-auto text-xs font-normal text-slate-500 dark:text-slate-400">{list.length}</span>
             </div>
             <div className="min-h-24 space-y-2.5">
               {list.map((t) => {
@@ -75,30 +75,28 @@ export default function TaskBoard({ tasks, onEdit, onDelete }: Props) {
                 const when = t.planned ? `${daysUntil(t.planned) === 0 ? "Today" : daysUntil(t.planned) === 1 ? "Tomorrow" : formatDate(t.planned)}${t.start ? ` · ${clock12(t.start)}` : ""}` : null;
                 return (
                   <article key={t.id} draggable onDragStart={(e) => { e.dataTransfer.setData(DRAG_TASK, t.id); e.dataTransfer.effectAllowed = "move"; }}
-                    className="card cursor-grab !p-3 active:cursor-grabbing">
+                    className="card group cursor-grab !rounded-xl !p-3 active:cursor-grabbing">
                     <div className="flex items-start gap-2">
-                      <input type="checkbox" className="mt-0.5 size-4 shrink-0 cursor-pointer accent-indigo-600" checked={done} onChange={() => toggleDone(t)} aria-label={`Mark “${t.title}” ${done ? "not done" : "done"}`} />
-                      <button className={`min-w-0 flex-1 cursor-pointer text-left text-sm font-medium ${done ? "text-slate-400 line-through" : "text-slate-900 dark:text-white"}`} onClick={() => onEdit(t)}>{t.title}</button>
-                      <NotesButton task={t} className="!size-6" />
-                      <PlayButton task={t} className="!size-6" />
-                      <button className="icon-btn !size-6 shrink-0" aria-label={`Delete “${t.title}”`} onClick={() => onDelete(t)}><Trash2 size={13} /></button>
+                      <input type="checkbox" className="mt-0.5 size-4 shrink-0 cursor-pointer accent-emerald-600" checked={done} onChange={() => toggleDone(t)} aria-label={`Mark “${t.title}” ${done ? "not done" : "done"}`} />
+                      <button className={`min-w-0 flex-1 cursor-pointer text-left text-sm font-medium ${done ? "text-slate-500 dark:text-slate-400 line-through" : "text-slate-900 dark:text-white"}`} onClick={() => onEdit(t)}>{t.title}</button>
                     </div>
                     <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                      <span className={`chip ${PRIO[t.priority ?? "med"]}`}>{PRIO_LABEL[t.priority ?? "med"]}</span>
-                      {t.subjects?.map((x) => <span key={x} className={`chip ${subjectTone(x)}`}>{x}</span>)}
+                      {(t.priority ?? "med") !== "med" && <span className={`chip ${PRIO[t.priority ?? "med"]}`}>{PRIO_LABEL[t.priority ?? "med"]}</span>}
+                      {t.subjects?.slice(0, 2).map((x) => <span key={x} className={`chip ${subjectTone(x)}`}>{x}</span>)}
+                      {(t.subjects?.length ?? 0) > 2 && <span className="chip bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-slate-300">+{t.subjects!.length - 2}</span>}
                       {t.revision && <span className="chip bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300"><Repeat size={11} className="mr-1" />every {t.revision.intervalDays}d</span>}
                       {phase === "overdue" && !overdueDay(t, today) && <span className="chip bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300">{-daysUntil(t.due ?? t.planned ?? today)}d overdue</span>}
                       {overdueDay(t, today) && <span className="chip bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300">Overdue day {overdueDay(t, today)}</span>}
                       {counter && <span className="chip bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300">{counter}</span>}
                     </div>
                     {(when || t.due) && (
-                      <div className="mt-2 flex items-center gap-1.5 text-xs text-slate-500">
-                        <CalendarClock size={12} aria-hidden />{when}{t.due && t.due !== t.planned && <span className="text-slate-400">· due {formatDate(t.due)}</span>}
+                      <div className="mt-2 flex flex-wrap items-center text-xs text-slate-500 dark:text-slate-400">
+                        <CalendarClock size={12} aria-hidden className="mr-1.5" /><span className="whitespace-nowrap">{when}</span>{t.due && t.due !== t.planned && <span className="ml-1.5 whitespace-nowrap text-slate-500 dark:text-slate-400">· due {formatDate(t.due)}</span>}
                       </div>
                     )}
                     {(est > 0 || !!t.timeMin) && (
                       <div className="mt-2">
-                        <div className="flex items-center gap-1.5 text-xs text-slate-500"><Clock size={12} aria-hidden />{fmtDur(t.timeMin ?? 0)} focused{est > 0 && <span className="text-slate-400">of {fmtDur(est)}</span>}</div>
+                        <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400"><Clock size={12} aria-hidden />{fmtDur(t.timeMin ?? 0)} focused{est > 0 && <span className="text-slate-500 dark:text-slate-400">of {fmtDur(est)}</span>}</div>
                         {est > 0 && <div className="mt-1 h-1 overflow-hidden rounded-full bg-slate-100 dark:bg-white/10" aria-hidden><div className="h-full rounded-full bg-indigo-500" style={{ width: `${Math.min(100, ((t.timeMin ?? 0) / est) * 100)}%` }} /></div>}
                       </div>
                     )}
@@ -106,18 +104,23 @@ export default function TaskBoard({ tasks, onEdit, onDelete }: Props) {
                       {col.key === "backlog" && (
                         <>
                           <button className="chip cursor-pointer border border-slate-200 hover:bg-slate-100 dark:border-white/10 dark:hover:bg-white/10" onClick={() => reschedule(t.id, today)}>Today</button>
-                          <button className="chip cursor-pointer border border-slate-200 hover:bg-slate-100 dark:border-white/10 dark:hover:bg-white/10" onClick={() => reschedule(t.id, addDays(today, 1))}>Tomorrow</button>
+                          <button className="chip cursor-pointer border border-slate-200 hover:bg-slate-100 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100 dark:border-white/10 dark:hover:bg-white/10" onClick={() => reschedule(t.id, addDays(today, 1))}>Tomorrow</button>
                         </>
                       )}
                       {t.revision && !done && (
                         <>
                           <button className="chip cursor-pointer bg-emerald-100 text-emerald-700 hover:brightness-95 dark:bg-emerald-500/15 dark:text-emerald-300" onClick={() => review(t.id, true)}>Revised</button>
-                          <button className="chip cursor-pointer border border-slate-200 hover:bg-slate-100 dark:border-white/10 dark:hover:bg-white/10" onClick={() => review(t.id, false)}>Forgot</button>
+                          <button className="chip cursor-pointer border border-slate-200 hover:bg-slate-100 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100 dark:border-white/10 dark:hover:bg-white/10" onClick={() => review(t.id, false)}>Forgot</button>
                         </>
                       )}
-                      {!done && !!t.missed?.length && <button className="chip cursor-pointer border border-rose-200 text-rose-600 hover:bg-rose-50 dark:border-rose-500/30 dark:hover:bg-rose-500/10" title="Put it back on the day it was missed" onClick={() => { const d = putBack(t.id); if (d) toast(`“${t.title}” put back on ${formatDate(d)}`); }}>Remove from today</button>}
-                      {phase === "overdue" && <button className="chip cursor-pointer border border-rose-200 text-rose-600 hover:bg-rose-50 dark:border-rose-500/30 dark:hover:bg-rose-500/10" onClick={() => reschedule(t.id, today)}>Move to today</button>}
-                      <select aria-label={`Status of “${t.title}”`} className="ml-auto cursor-pointer rounded-md border border-slate-200 bg-transparent px-1.5 py-0.5 text-xs text-slate-500 dark:border-white/10" value={col.key} onChange={(e) => move(t, e.target.value as Column)}>
+                      {!done && !!t.missed?.length && <button className="chip cursor-pointer border border-rose-200 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:border-rose-500/30 dark:hover:bg-rose-500/10" title="Put it back on the day it was missed" onClick={() => { const d = putBack(t.id); if (d) toast(`“${t.title}” put back on ${formatDate(d)}`); }}>Remove from today</button>}
+                      {phase === "overdue" && <button className="chip cursor-pointer border border-rose-200 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:border-rose-500/30 dark:hover:bg-rose-500/10" onClick={() => reschedule(t.id, today)}>Move to today</button>}
+                      <span className="ml-auto flex items-center gap-1">
+                        <NotesButton task={t} className="!size-6" />
+                        <PlayButton task={t} className="!size-6" />
+                        <button className="icon-btn !size-6 shrink-0 hover:!text-rose-600 dark:text-rose-400 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100" aria-label={`Delete “${t.title}”`} onClick={() => onDelete(t)}><Trash2 size={13} /></button>
+                      </span>
+                      <select aria-label={`Status of “${t.title}”`} className="cursor-pointer rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-xs text-slate-600 dark:border-white/10 dark:bg-panel dark:text-slate-300" value={col.key} onChange={(e) => move(t, e.target.value as Column)}>
                         {COLS.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
                       </select>
                     </div>
@@ -125,7 +128,7 @@ export default function TaskBoard({ tasks, onEdit, onDelete }: Props) {
                 );
               })}
               {!list.length && (
-                <div className="py-6 text-center text-xs text-slate-400">
+                <div className="py-6 text-center text-xs text-slate-500 dark:text-slate-400">
                   {col.key === "done" ? <><CheckCircle2 className="mx-auto mb-1" size={18} />Nothing finished in this period</> : col.hint || "Empty"}
                 </div>
               )}

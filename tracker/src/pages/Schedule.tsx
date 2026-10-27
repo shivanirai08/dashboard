@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { AlertCircle, CalendarDays, Check, ChevronLeft, ChevronRight, Clock, Inbox, KanbanSquare, Plus, Repeat, Target, Undo2 } from "lucide-react";
+import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { AlertCircle, CalendarDays, Check, ChevronLeft, ChevronRight, Clock, Inbox, KanbanSquare, NotebookPen, Plus, Repeat, Target, Trophy, Undo2 } from "lucide-react";
 import { useStore } from "../lib/store";
 import { useToast } from "../components/Toast";
 import { useRemove } from "../lib/undo";
@@ -52,7 +52,9 @@ function ghostLabel(state: AppState, id: string, date: string, day: number) {
 function tone(t: TodoItem, today: string) {
   if (t.status === "done") return { box: "border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-500/40 dark:bg-emerald-500/15 dark:text-emerald-100", bar: "bg-emerald-500" };
   if ((t.planned ?? t.due ?? today) < today) return { box: "border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/15 dark:text-amber-100", bar: "bg-amber-500" };
-  return { box: "border-indigo-300 bg-indigo-50 text-indigo-900 dark:border-indigo-500/40 dark:bg-indigo-500/15 dark:text-indigo-100", bar: "bg-brand-500" };
+  // in progress (its day has started) is stronger than upcoming, which stays an outline
+  if ((t.planned ?? today) <= today) return { box: "border-indigo-400 bg-indigo-100 text-indigo-950 dark:border-indigo-400/60 dark:bg-indigo-500/25 dark:text-indigo-50", bar: "bg-brand-600" };
+  return { box: "border-indigo-200 bg-white text-indigo-900 dark:border-indigo-500/30 dark:bg-transparent dark:text-indigo-100", bar: "bg-brand-500/60" };
 }
 
 const dropProps = (onDrop: (id: string) => void) => ({
@@ -117,22 +119,22 @@ export default function Schedule() {
 
   return (
     <>
-      <PageHeader title="Schedule" sub="Every task lives here — on the calendar by day, or on the board by status. Same tasks, two views.">
+      <PageHeader title="Schedule & Tasks">
         <button className="btn" onClick={() => openNew()}><Plus size={16} />New task</button>
       </PageHeader>
 
       <div className="mb-5 flex flex-wrap items-center gap-2">
         <div className="inline-flex items-center rounded-xl border border-slate-200 bg-white p-0.5 dark:border-white/10 dark:bg-white/[.03]">
-          <button className="icon-btn !text-slate-500 hover:!text-slate-900 dark:hover:!text-white" aria-label={`Previous ${range}`} onClick={() => move(-1)}><ChevronLeft size={18} /></button>
+          <button className="icon-btn !text-slate-500 dark:text-slate-400 hover:!text-slate-900 dark:hover:!text-white" aria-label={`Previous ${range}`} onClick={() => move(-1)}><ChevronLeft size={18} /></button>
           <button className="cursor-pointer rounded-lg px-3 py-1 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:cursor-default disabled:text-slate-400 disabled:hover:bg-transparent dark:text-slate-200 dark:hover:bg-white/10" disabled={isCurrent} onClick={() => setDate(today)}>Today</button>
-          <button className="icon-btn !text-slate-500 hover:!text-slate-900 dark:hover:!text-white" aria-label={`Next ${range}`} onClick={() => move(1)}><ChevronRight size={18} /></button>
+          <button className="icon-btn !text-slate-500 dark:text-slate-400 hover:!text-slate-900 dark:hover:!text-white" aria-label={`Next ${range}`} onClick={() => move(1)}><ChevronRight size={18} /></button>
         </div>
         <h2 className="mr-1 min-w-0 text-lg font-semibold text-slate-900 dark:text-white" aria-live="polite">
           {heading}
           {range === "day" && relLabel(date) && <span className="chip ml-2 bg-brand-50 align-middle text-brand-700 dark:bg-brand-500/15 dark:text-brand-50">{relLabel(date)}</span>}
         </h2>
         <div className="ml-auto flex flex-wrap items-center gap-2">
-          {range === "day" && <input type="date" className="input !w-auto" aria-label="Jump to date" value={date} onChange={(e) => e.target.value && setDate(e.target.value)} />}
+          {range === "day" && <input type="date" className="input !w-auto max-xl:hidden" aria-label="Jump to date" value={date} onChange={(e) => e.target.value && setDate(e.target.value)} />}
           <Segmented label="Duration" value={range} onChange={setRange} options={[["day", "Day"], ["week", "Week"], ["month", "Month"]]} />
           <Segmented label="View" value={view} onChange={setView} options={[["calendar", "Calendar", CalendarDays], ["board", "Board", KanbanSquare]]} />
         </div>
@@ -157,7 +159,7 @@ function Segmented<T extends string>({ label, value, onChange, options }: { labe
     <div role="tablist" aria-label={label} className="inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1 dark:border-white/10 dark:bg-white/[.03]">
       {options.map(([v, l, Icon]) => (
         <button key={v} role="tab" aria-selected={value === v} onClick={() => onChange(v)}
-          className={`flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1 text-sm transition ${value === v ? "bg-brand-500 text-white shadow-sm" : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"}`}>{Icon && <Icon size={14} />}{l}</button>
+          className={`flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1 text-sm transition ${value === v ? "bg-brand-600 text-white shadow-sm" : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"}`}>{Icon && <Icon size={14} />}{l}</button>
       ))}
     </div>
   );
@@ -176,7 +178,9 @@ type DayProps = {
 
 function DayView({ date, today, now, stats, backlog, onEdit, onNew, onToggle }: DayProps) {
   const { state } = useStore();
-  const { reschedule, putBack } = useTasks();
+  const { reschedule, putBack, create } = useTasks();
+  const [quick, setQuick] = useState("");
+  const addQuick = () => { if (!quick.trim() || (!!state.lockPastDays && date < today)) return; create({ title: quick.trim(), planned: date }); setQuick(""); toast(`Added “${quick.trim()}” — ${date === today ? "today" : shortDay(date)}`); };
   const toast = useToast();
   const scroller = useRef<HTMLDivElement>(null);
   const timed = stats.timed;
@@ -233,12 +237,12 @@ function DayView({ date, today, now, stats, backlog, onEdit, onNew, onToggle }: 
         )}
         {(strip.length > 0 || ghostStrip.length > 0) && (
           <div className="border-b border-slate-100 px-4 py-2.5 dark:border-white/[.06]">
-            <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">In progress · carried over</div>
+            <div className="mb-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300">In progress · carried over</div>
             <div className="flex flex-wrap gap-2">
               {ghostStrip.map(({ task: t, day }) => (
                 <div key={`ghost-${t.id}`} className="flex max-w-full items-center gap-2 rounded-lg border border-dashed border-amber-300 bg-amber-50/50 px-2 py-1 text-sm text-amber-900/70 dark:border-amber-500/30 dark:bg-amber-500/5 dark:text-amber-100/70">
                   <button className="min-w-0 cursor-pointer truncate text-left font-medium" onClick={() => onEdit(t)}>{t.title}</button>
-                  <span className="shrink-0 text-[11px] font-semibold">{ghostLabel(state, t.id, date, day)}</span>
+                  <span className="shrink-0 text-xs font-semibold">{ghostLabel(state, t.id, date, day)}</span>
                 </div>
               ))}
               {strip.map((t) => {
@@ -248,10 +252,10 @@ function DayView({ date, today, now, stats, backlog, onEdit, onNew, onToggle }: 
                   <div key={t.id} {...dragProps(t.id)} className={`flex max-w-full items-center gap-2 rounded-lg border px-2 py-1 text-sm ${late ? "border-rose-300 bg-rose-50 text-rose-900 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-100" : tone(t, today).box}`}>
                     <input type="checkbox" className="size-4 shrink-0 cursor-pointer accent-emerald-600" checked={t.status === "done"} onChange={() => onToggle(t)} aria-label={`Mark “${t.title}” ${t.status === "done" ? "not done" : "done"}`} />
                     <button className={`min-w-0 cursor-pointer truncate text-left font-medium ${t.status === "done" ? "line-through opacity-70" : ""}`} onClick={() => onEdit(t)}>{t.revision && <Repeat size={12} className="mr-1 inline" aria-label="Revision" />}{t.title}</button>
-                    {late && !overdueDay(t, today) && <span className="shrink-0 text-[11px] font-semibold">{-daysUntil(t.due ?? t.planned ?? today)}d overdue</span>}
-                    {counter && <span className="shrink-0 text-[11px] opacity-70">{counter}</span>}
-                    {overdueDay(t, today) && <span className="shrink-0 rounded bg-rose-100 px-1 text-[11px] font-semibold text-rose-700 dark:bg-rose-500/20 dark:text-rose-200">Overdue day {overdueDay(t, today)}</span>}
-                    {late && isToday && <button className="shrink-0 cursor-pointer text-[11px] font-semibold underline-offset-2 hover:underline" onClick={() => reschedule(t.id, today)}>Move to today</button>}
+                    {late && !overdueDay(t, today) && <span className="shrink-0 text-xs font-semibold">{-daysUntil(t.due ?? t.planned ?? today)}d overdue</span>}
+                    {counter && <span className="shrink-0 text-xs opacity-70">{counter}</span>}
+                    {overdueDay(t, today) && <span className="shrink-0 rounded bg-rose-100 px-1 text-xs font-semibold text-rose-700 dark:bg-rose-500/20 dark:text-rose-200">Overdue day {overdueDay(t, today)}</span>}
+                    {late && isToday && <button className="shrink-0 cursor-pointer text-xs font-semibold underline-offset-2 hover:underline" onClick={() => reschedule(t.id, today)}>Move to today</button>}
                     <NotesButton task={t} className="!size-6" />
                     <PlayButton task={t} className="!size-6" />
                   </div>
@@ -260,19 +264,25 @@ function DayView({ date, today, now, stats, backlog, onEdit, onNew, onToggle }: 
             </div>
           </div>
         )}
+        {!(state.lockPastDays && past) && (
+          <div className="flex gap-2 border-b border-slate-100 px-4 py-2.5 dark:border-white/[.06]">
+            <input className="input min-w-0 flex-1" aria-label="Quick add a task" placeholder={`Add a task for ${isToday ? "today" : shortDay(date)}…`} value={quick} onChange={(e) => setQuick(e.target.value)} onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addQuick())} />
+            <button type="button" className="btn-ghost" disabled={!quick.trim()} onClick={addQuick}><Plus size={15} />Add</button>
+          </div>
+        )}
         <div ref={scroller} className="max-h-[68vh] min-h-[420px] overflow-y-auto">
           <div className={`relative ml-14 mr-3 ${locked ? "" : "cursor-copy"}`} style={{ height: hours.length * HOUR_PX }} onClick={clickGrid} title={locked ? "Past days are locked" : "Click an empty slot to add a task"}
             {...dropProps(() => {})} onDrop={(e) => { const id = e.dataTransfer.getData(DRAG_TASK); if (id) { e.preventDefault(); dropOnGrid(id, e); } }}>
             {hours.map((h, i) => (
               <div key={h} className="pointer-events-none absolute inset-x-0 border-t border-slate-100 dark:border-white/[.06]" style={{ top: i * HOUR_PX }}>
-                <span className="absolute -left-12 -top-2 w-10 text-right text-[11px] tabular-nums text-slate-400">{i ? clock12(fromMin(h * 60)) : ""}</span>
+                <span className="absolute -left-12 -top-2 w-10 text-right text-xs tabular-nums text-slate-500 dark:text-slate-400">{i ? clock12(fromMin(h * 60)) : ""}</span>
                 <div className="absolute inset-x-0 top-1/2 border-t border-dashed border-slate-100/70 dark:border-white/[.03]" />
               </div>
             ))}
 
             {isToday && nowMin >= startH * 60 && (
               <div className="pointer-events-none absolute inset-x-0 z-10 flex items-center" style={{ top: ((nowMin - startH * 60) / 60) * HOUR_PX }}>
-                <span className="-ml-1 size-2 rounded-full bg-rose-500" /><span className="h-px flex-1 bg-rose-500" />
+                <span className="-ml-1 size-2 rounded-full bg-rose-500" /><span className="h-px flex-1 bg-rose-500" /><span className="absolute -left-[3.25rem] -top-2.5 z-20 whitespace-nowrap rounded bg-rose-600 px-1 text-center text-[11px] font-semibold leading-5 tabular-nums text-white">{clock12(fromMin(nowMin))}</span>
               </div>
             )}
 
@@ -286,7 +296,7 @@ function DayView({ date, today, now, stats, backlog, onEdit, onNew, onToggle }: 
                   <span className="absolute inset-y-0 left-0 w-1 bg-amber-400/60" />
                   <div className="py-1 pl-3 pr-2">
                     <div className="truncate text-sm font-semibold leading-tight">{t.title}</div>
-                    {height >= 44 && <div className="truncate text-[11px]">{clock12(slot.start!)} – {clock12(slot.end!)} · {ghostLabel(state, t.id, date, day)}</div>}
+                    {height >= 44 && <div className="truncate text-xs">{clock12(slot.start!)} – {clock12(slot.end!)} · {ghostLabel(state, t.id, date, day)}</div>}
                   </div>
                 </div>
               );
@@ -301,23 +311,23 @@ function DayView({ date, today, now, stats, backlog, onEdit, onNew, onToggle }: 
               // as many notes (max 2) as fit under the title and time line
               const noteLines = Math.max(0, Math.min(2, t.notes?.length ?? 0, Math.floor((height - 8 - 20 - (height >= 44 ? 16 : 0)) / 18)));
               return (
-                <div key={t.id} {...dragProps(t.id)} className={`absolute cursor-pointer overflow-hidden rounded-lg border text-left shadow-sm transition hover:shadow-md ${c.box}`}
+                <div key={t.id} {...dragProps(t.id)} className={`group absolute cursor-pointer overflow-hidden rounded-lg border text-left shadow-sm transition hover:shadow-md ${c.box}`}
                   style={{ top, height, left: `calc(${(lane / n) * 100}% + 2px)`, width: `calc(${100 / n}% - 4px)` }} onClick={() => onEdit(t)}>
                   <span className={`absolute inset-y-0 left-0 w-1 ${c.bar}`} />
                   <div className="flex h-full items-start gap-2 py-1 pl-3 pr-2">
                     <input type="checkbox" className="mt-0.5 size-4 shrink-0 cursor-pointer accent-emerald-600" checked={done} onClick={(e) => e.stopPropagation()} onChange={() => onToggle(t)} aria-label={`Mark “${t.title}” ${done ? "not done" : "done"}`} />
                     <button className="min-w-0 flex-1 cursor-pointer text-left" onClick={(e) => { e.stopPropagation(); onEdit(t); }} aria-label={`Edit ${t.title}`}>
                       <div className={`truncate text-sm font-semibold leading-tight ${done ? "line-through opacity-70" : ""}`}>{t.revision && <Repeat size={12} className="mr-1 inline" aria-label="Revision" />}{t.title}</div>
-                      {overdueDay(t, today) && <span className="mr-1 rounded bg-rose-100 px-1 text-[10px] font-semibold text-rose-700 dark:bg-rose-500/20 dark:text-rose-200">Overdue day {overdueDay(t, today)}</span>}
-                      {height >= 44 && <div className="truncate text-[11px] opacity-75">{clock12(t.start!)} – {clock12(t.end!)}{!!t.subjects?.length && ` · ${t.subjects.join(", ")}`}{!!t.timeMin && ` · ⏱ ${fmtDur(t.timeMin)}`}</div>}
+                      {overdueDay(t, today) && <span className="mr-1 rounded bg-rose-100 px-1 text-[11px] font-semibold text-rose-700 dark:bg-rose-500/20 dark:text-rose-200">Overdue day {overdueDay(t, today)}</span>}
+                      {height >= 44 && <div className="truncate text-xs opacity-75">{clock12(t.start!)} – {clock12(t.end!)}{!!t.subjects?.length && ` · ${t.subjects.join(", ")}`}{!!t.timeMin && ` · ${fmtDur(t.timeMin)} focused`}</div>}
                       {noteLines > 0 && (
                         <div className="mt-0.5 space-y-0.5">
-                          {t.notes!.slice(0, noteLines).map((n) => <div key={n.id} className="truncate border-l-2 border-current/50 pl-1.5 text-[13px] font-medium leading-[17px]" title={n.text}>{n.text}</div>)}
-                          {t.notes!.length > noteLines && <div className="pl-2 text-[11px] opacity-70">+{t.notes!.length - noteLines} more</div>}
+                          {t.notes!.slice(0, noteLines).map((n) => <div key={n.id} className="truncate pl-2 text-[13px] font-medium leading-[17px]" title={n.text}>{n.text}</div>)}
+                          {t.notes!.length > noteLines && <div className="pl-2 text-xs opacity-70">+{t.notes!.length - noteLines} more</div>}
                         </div>
                       )}
                     </button>
-                    {!done && !!t.missed?.length && <button type="button" className="icon-btn !size-6 shrink-0" title="Remove from today — put it back on the day it was missed" aria-label={`Remove “${t.title}” from today`}
+                    {!done && !!t.missed?.length && <button type="button" className="icon-btn !size-6 shrink-0 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100" title="Remove from today — put it back on the day it was missed" aria-label={`Remove “${t.title}” from today`}
                       onClick={(e) => { e.stopPropagation(); const d = putBack(t.id); if (d) toast(`Put back on ${shortDay(d)}`); }}><Undo2 size={13} /></button>}
                     <NotesButton task={t} className="!size-6" />
                     <PlayButton task={t} className="!size-6" />
@@ -327,7 +337,7 @@ function DayView({ date, today, now, stats, backlog, onEdit, onNew, onToggle }: 
             })}
 
             {!timed.length && (
-              <div className="pointer-events-none absolute inset-x-0 top-24 text-center text-sm text-slate-400">
+              <div className="pointer-events-none absolute inset-x-0 top-24 text-center text-sm text-slate-500 dark:text-slate-400">
                 <CalendarDays className="mx-auto mb-2" size={28} />
                 {past ? "Nothing was scheduled for this day." : "Nothing scheduled — click a slot or use New task."}
               </div>
@@ -339,27 +349,40 @@ function DayView({ date, today, now, stats, backlog, onEdit, onNew, onToggle }: 
       <aside className="space-y-4">
         <div className="card">
           <div className="card-title flex items-center justify-between">{past ? "Day recap" : isToday ? "Today’s progress" : "Plan summary"}
-            {stats.completion !== null && <span className="text-xs font-normal tabular-nums text-slate-500">{Math.round(stats.completion * 100)}%</span>}
+            {stats.completion !== null && <span className="text-xs font-normal tabular-nums text-slate-500 dark:text-slate-400">{Math.round(stats.completion * 100)}%</span>}
           </div>
           <div className="h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-white/10" role="progressbar" aria-valuenow={Math.round((stats.completion ?? 0) * 100)} aria-valuemin={0} aria-valuemax={100} aria-label="Tasks completed">
             <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${(stats.completion ?? 0) * 100}%` }} />
           </div>
-          <dl className="mt-4 grid grid-cols-2 gap-2">
+          <dl className="mt-4 divide-y divide-slate-100 text-sm dark:divide-white/[.06]">
             {[
               ["Tasks done", `${stats.done}/${stats.tasks.length}`],
               ["Time planned", `${fmtDur(stats.doneMin)} / ${fmtDur(stats.plannedMin)}`],
               ["Focused", fmtDur(stats.focusMin)],
               ["On tasks · extra", `${fmtDur(stats.taskFocusMin)} · ${fmtDur(stats.extraFocusMin)}`],
             ].map(([k, v]) => (
-              <div key={k} className="stat !px-3 !py-2"><dt className="text-[11px] text-slate-500">{k}</dt><dd className="text-sm font-semibold tabular-nums text-slate-900 dark:text-white">{v}</dd></div>
+              <div key={k} className="flex items-baseline justify-between gap-3 py-2 first:pt-0 last:pb-0"><dt className="text-slate-500 dark:text-slate-400">{k}</dt><dd className="font-semibold tabular-nums text-slate-900 dark:text-white">{v}</dd></div>
             ))}
           </dl>
           {(stats.mistakes > 0 || mocks.length > 0) && (
-            <div className="mt-3 space-y-1 text-xs text-slate-500">
-              {mocks.map((m) => <div key={m.id}>🏆 {m.name}: {m.score}/{m.maxScore}</div>)}
-              {stats.mistakes > 0 && <div>📝 {stats.mistakes} mistake{stats.mistakes > 1 ? "s" : ""} logged</div>}
+            <div className="mt-3 space-y-1.5 border-t border-slate-100 pt-3 text-xs text-slate-500 dark:text-slate-400 dark:border-white/[.06]">
+              {mocks.map((m) => <div key={m.id} className="flex items-center gap-1.5"><Trophy size={13} aria-hidden />{m.name}: {m.score}/{m.maxScore}</div>)}
+              {stats.mistakes > 0 && <div className="flex items-center gap-1.5"><NotebookPen size={13} aria-hidden />{stats.mistakes} mistake{stats.mistakes > 1 ? "s" : ""} logged</div>}
             </div>
           )}
+          <div className="mt-4 border-t border-slate-100 pt-3 dark:border-white/[.06]">
+          <div className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-slate-900 dark:text-white"><Clock size={14} />Session log</div>
+          {sessions.length ? sessions.slice(0, 8).map((p) => {
+            const name = taskName(p.taskId);
+            return (
+              <div key={p.id} className="flex items-center gap-2 py-1 text-sm">
+                <span className="w-14 shrink-0 text-xs font-medium tabular-nums text-slate-500 dark:text-slate-400">{fmtDur(p.minutes)}</span>
+                <span className="min-w-0 flex-1 truncate">{name ?? p.label ?? "Extra study"}</span>
+                {!p.taskId && <span className="chip bg-slate-100 text-slate-500 dark:text-slate-400 dark:bg-white/10">extra</span>}
+              </div>
+            );
+          }) : <div className="py-2 text-sm text-slate-500 dark:text-slate-400">No focus sessions {isToday ? "yet — start one from the Dashboard" : "this day"}.</div>}
+          </div>
         </div>
 
         <div className="card">
@@ -370,22 +393,8 @@ function DayView({ date, today, now, stats, backlog, onEdit, onNew, onToggle }: 
               <NotesButton task={t} className="!size-6" />
               {!past && <button className="chip cursor-pointer border border-slate-200 hover:bg-slate-100 dark:border-white/10 dark:hover:bg-white/10" onClick={() => reschedule(t.id, date)} aria-label={`Schedule “${t.title}” on ${shortDay(date)}`}>{isToday ? "Today" : shortDay(date)}</button>}
             </div>
-          )) : <div className="py-2 text-sm text-slate-400">Nothing waiting. Use “Keep in todo” when adding a task you haven’t placed yet.</div>}
-          {backlog.length > 6 && <div className="text-xs text-slate-400">+{backlog.length - 6} more — see the Board view</div>}
-        </div>
-
-        <div className="card">
-          <div className="card-title flex items-center gap-1.5"><Clock size={14} />Session log</div>
-          {sessions.length ? sessions.slice(0, 8).map((p) => {
-            const name = taskName(p.taskId);
-            return (
-              <div key={p.id} className="flex items-center gap-2 py-1 text-sm">
-                <span className="chip bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300">{fmtDur(p.minutes)}</span>
-                <span className="min-w-0 flex-1 truncate">{name ?? p.label ?? "Extra study"}</span>
-                {!p.taskId && <span className="chip bg-slate-100 text-slate-500 dark:bg-white/10">extra</span>}
-              </div>
-            );
-          }) : <div className="py-2 text-sm text-slate-400">No focus sessions {isToday ? "yet — start one from the Dashboard" : "this day"}.</div>}
+          )) : <div className="py-2 text-sm text-slate-500 dark:text-slate-400">Nothing waiting. Use “Keep in todo” when adding a task you haven’t placed yet.</div>}
+          {backlog.length > 6 && <div className="text-xs text-slate-500 dark:text-slate-400">+{backlog.length - 6} more — see the Board view</div>}
         </div>
 
       </aside>
@@ -408,18 +417,18 @@ function WeekView({ stats, today, onOpen, onToggle, onEdit, onNew, onMove }: Wee
         const items = [...s.tasks].sort((a, b) => (a.planned === s.date ? a.start ?? "99" : "00").localeCompare(b.planned === s.date ? b.start ?? "99" : "00"));
         return (
           <section key={s.date} aria-label={longDay(s.date)} {...dropProps((id) => onMove(id, s.date))}
-            className={`flex min-h-48 flex-col rounded-2xl border bg-white p-2.5 dark:bg-[#111522] ${isToday ? "border-brand-500/60 ring-2 ring-brand-500/15" : "border-slate-200/80 dark:border-white/[.07]"}`}>
+            className={`flex min-h-48 flex-col rounded-2xl border bg-white p-2.5 dark:bg-panel ${isToday ? "border-brand-500/60 ring-2 ring-brand-500/15" : "border-slate-200/80 dark:border-white/[.07]"}`}>
             <div className="mb-2 flex items-start justify-between gap-1">
               <button className="cursor-pointer text-left" onClick={() => onOpen(s.date)} aria-label={`Open ${longDay(s.date)}`}>
-                <div className={`text-[11px] font-semibold uppercase tracking-wider ${isToday ? "text-brand-600" : "text-slate-400"}`}>{weekday(s.date)}</div>
-                <div className={`text-xl font-bold leading-none ${isToday ? "text-brand-600" : "text-slate-900 dark:text-white"}`}>{Number(s.date.slice(8))}</div>
+                <div className={`text-xs font-semibold uppercase tracking-wider ${isToday ? "text-brand-600 dark:text-brand-300" : "text-slate-500 dark:text-slate-400"}`}>{weekday(s.date)}</div>
+                <div className={`text-xl font-bold leading-none ${isToday ? "text-brand-600 dark:text-brand-300" : "text-slate-900 dark:text-white"}`}>{Number(s.date.slice(8))}</div>
               </button>
-              {!(state.lockPastDays && s.date < today) && <button className="icon-btn !size-6 hover:!text-brand-600" aria-label={`Add task on ${longDay(s.date)}`} onClick={() => onNew(s.date)}><Plus size={14} /></button>}
+              {!(state.lockPastDays && s.date < today) && <button className="icon-btn !size-6 hover:!text-brand-600 dark:text-brand-300" aria-label={`Add task on ${longDay(s.date)}`} onClick={() => onNew(s.date)}><Plus size={14} /></button>}
             </div>
             <div className="mb-2 h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-white/10" aria-hidden>
               <div className={`h-full rounded-full ${s.date < today && (s.completion ?? 1) < 1 ? "bg-amber-500" : "bg-emerald-500"}`} style={{ width: `${(s.completion ?? 0) * 100}%` }} />
             </div>
-            <div className="mb-2 text-[11px] tabular-nums text-slate-500">{s.tasks.length ? `${s.done}/${s.tasks.length} done${s.plannedMin ? ` · ${fmtDur(s.plannedMin)}` : ""}` : "Free day"}</div>
+            <div className="mb-2 text-xs tabular-nums text-slate-500 dark:text-slate-400">{s.tasks.length ? `${s.done}/${s.tasks.length} done${s.plannedMin ? ` · ${fmtDur(s.plannedMin)}` : ""}` : "Free day"}</div>
             <div className="flex-1 space-y-1.5">
               {items.map((t) => {
                 const c = tone(t, today);
@@ -427,19 +436,23 @@ function WeekView({ stats, today, onOpen, onToggle, onEdit, onNew, onMove }: Wee
                 return (
                   <div key={t.id} {...dragProps(t.id)} className={`flex cursor-grab items-start gap-1.5 rounded-lg border px-1.5 py-1 text-xs ${c.box} ${own ? "" : "border-dashed"}`}>
                     <input type="checkbox" className="mt-0.5 size-3.5 shrink-0 cursor-pointer accent-emerald-600" checked={t.status === "done"} onChange={() => onToggle(t)} aria-label={`Mark “${t.title}” ${t.status === "done" ? "not done" : "done"}`} />
-                    <button className="min-w-0 flex-1 cursor-pointer text-left" onClick={() => onEdit(t)}>
-                      <div className={`truncate font-medium ${t.status === "done" ? "line-through opacity-70" : ""}`}>{t.revision && <Repeat size={10} className="mr-1 inline" aria-label="Revision" />}{t.title}</div>
-                      <div className="text-[10px] opacity-70">{own && t.start ? clock12(t.start) : own ? "all day" : dayCounter(t, s.date) ?? "carried over"}</div>
-                    </button>
-                    <NotesButton task={t} className="!size-5" />
-                    {s.date === today && <PlayButton task={t} className="!size-5" />}
+                    <div className="min-w-0 flex-1">
+                      <button className="block w-full cursor-pointer text-left" onClick={() => onEdit(t)}>
+                        <div className={`line-clamp-2 break-words font-medium ${t.status === "done" ? "line-through opacity-70" : ""}`}>{t.revision && <Repeat size={10} className="mr-1 inline" aria-label="Revision" />}{t.title}</div>
+                      </button>
+                      <div className="mt-0.5 flex items-center gap-1">
+                        <span className="min-w-0 flex-1 truncate text-[11px] opacity-70">{own && t.start ? clock12(t.start) : own ? "all day" : dayCounter(t, s.date) ?? "carried over"}</span>
+                        <NotesButton task={t} className="!size-5" />
+                        {s.date === today && <PlayButton task={t} className="!size-5" />}
+                      </div>
+                    </div>
                   </div>
                 );
               })}
               {missedOn(state, s.date).map(({ task: t, slot, day }) => (
                 <button key={`ghost-${t.id}`} onClick={() => onEdit(t)} className="block w-full cursor-pointer rounded-lg border border-dashed border-amber-300 bg-amber-50/50 px-1.5 py-1 text-left text-xs text-amber-900/70 dark:border-amber-500/30 dark:bg-amber-500/5 dark:text-amber-100/70 hover:bg-amber-100 dark:hover:bg-amber-500/20">
                   <div className="truncate font-medium">{t.title}</div>
-                  <div className="text-[10px]">{slot.start ? `${clock12(slot.start)} · ` : ""}{ghostLabel(state, t.id, s.date, day)}</div>
+                  <div className="text-[11px]">{slot.start ? `${clock12(slot.start)} · ` : ""}{ghostLabel(state, t.id, s.date, day)}</div>
                 </button>
               ))}
             </div>
@@ -460,7 +473,7 @@ function MonthView({ stats, month, today, onOpen, onEdit, onMove }: { stats: Day
   const byDate = new Map(stats.map((s) => [s.date, s]));
   return (
     <div className="card !p-2 sm:!p-3">
-      <div className="mb-1 grid grid-cols-7 text-center text-[11px] font-semibold uppercase tracking-wider text-slate-400" aria-hidden>
+      <div className="mb-1 grid grid-cols-7 text-center text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400" aria-hidden>
         {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => <div key={d} className="py-1">{d}</div>)}
       </div>
       <div className="grid grid-cols-7 gap-px overflow-hidden rounded-xl bg-slate-200 dark:bg-white/[.08]">
@@ -472,22 +485,21 @@ function MonthView({ stats, month, today, onOpen, onEdit, onMove }: { stats: Day
           const missed = d < today && s.completion !== null && s.completion < 1;
           const items = [...s.tasks].sort((a, b) => (a.start ?? "99").localeCompare(b.start ?? "99"));
           return (
-            <div key={d} role="button" tabIndex={0} onClick={() => onOpen(d)} onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), onOpen(d))} {...dropProps((id) => onMove(id, d))}
-              aria-label={`${longDay(d)}: ${s.tasks.length ? `${s.done} of ${s.tasks.length} tasks done` : "no tasks"}`}
-              className={`flex min-h-[72px] cursor-pointer flex-col gap-1 bg-white p-1.5 text-left transition hover:bg-brand-50 sm:min-h-28 dark:bg-[#111522] dark:hover:bg-white/[.04] ${inMonth ? "" : "opacity-40"}`}>
+            <div key={d} onClick={() => onOpen(d)} {...dropProps((id) => onMove(id, d))}
+              className={`flex min-h-[72px] cursor-pointer flex-col gap-1 bg-white p-1.5 text-left transition hover:bg-brand-50 sm:min-h-28 dark:bg-panel dark:hover:bg-white/[.04] ${inMonth ? "" : "opacity-40"}`}>
               <div className="flex items-center justify-between">
-                <span className={`grid size-6 place-items-center rounded-full text-xs font-semibold ${isToday ? "bg-brand-500 text-white" : "text-slate-700 dark:text-slate-300"}`}>{Number(d.slice(8))}</span>
+                <button type="button" onClick={(e) => { e.stopPropagation(); onOpen(d); }} aria-label={`${longDay(d)}: ${s.tasks.length ? `${s.done} of ${s.tasks.length} tasks done` : "no tasks"}`} className={`grid size-6 cursor-pointer place-items-center rounded-full text-xs font-semibold ${isToday ? "bg-brand-600 text-white" : "text-slate-700 dark:text-slate-300"}`}>{Number(d.slice(8))}</button>
                 {full ? <Check size={14} className="text-emerald-500" aria-hidden /> : missed ? <span className="size-2 rounded-full bg-amber-500" aria-hidden /> : null}
               </div>
               <div className="hidden min-w-0 flex-1 space-y-0.5 sm:block">
                 {items.slice(0, 3).map((t) => {
                   const c = tone(t, today);
-                  return <div key={t.id} {...dragProps(t.id)} onClick={(e) => { e.stopPropagation(); onEdit(t); }} className={`cursor-grab truncate rounded border-l-2 px-1 text-[10px] leading-4 ${c.box} ${c.bar.replace("bg-", "border-l-")} ${t.status === "done" ? "line-through opacity-70" : ""}`}>{t.title}</div>;
+                  return <div key={t.id} {...dragProps(t.id)} role="button" tabIndex={0} onClick={(e) => { e.stopPropagation(); onEdit(t); }} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); onEdit(t); } }} className={`cursor-grab truncate rounded px-1.5 text-xs leading-5 ${c.box} ${t.status === "done" ? "line-through opacity-70" : ""}`}>{t.title}</div>;
                 })}
                 {missedOn(state, d).slice(0, Math.max(0, 3 - items.length)).map(({ task: t }) => (
-                  <div key={`ghost-${t.id}`} onClick={(e) => { e.stopPropagation(); onEdit(t); }} className="cursor-pointer truncate rounded border border-dashed border-amber-300 bg-amber-50/50 px-1 text-[10px] leading-4 text-amber-900/70 hover:bg-amber-100 dark:border-amber-500/30 dark:bg-amber-500/5 dark:text-amber-100/70 dark:hover:bg-amber-500/20" title="Not finished — moved on">{t.title}</div>
+                  <div key={`ghost-${t.id}`} onClick={(e) => { e.stopPropagation(); onEdit(t); }} className="cursor-pointer truncate rounded border border-dashed border-amber-300 bg-amber-50/50 px-1 text-[11px] leading-4 text-amber-900/70 hover:bg-amber-100 dark:border-amber-500/30 dark:bg-amber-500/5 dark:text-amber-100/70 dark:hover:bg-amber-500/20" title="Not finished — moved on">{t.title}</div>
                 ))}
-                {items.length > 3 && <div className="px-1 text-[10px] text-slate-400">+{items.length - 3} more</div>}
+                {items.length > 3 && <div className="px-1 text-[11px] text-slate-500 dark:text-slate-400">+{items.length - 3} more</div>}
               </div>
               {s.tasks.length > 0 && (
                 <div className="mt-auto h-1 overflow-hidden rounded-full bg-slate-100 dark:bg-white/10" aria-hidden>
@@ -498,7 +510,7 @@ function MonthView({ stats, month, today, onOpen, onEdit, onMove }: { stats: Day
           );
         })}
       </div>
-      <div className="mt-2 flex flex-wrap gap-4 px-1 text-[11px] text-slate-500">
+      <div className="mt-2 flex flex-wrap gap-4 px-1 text-xs text-slate-500 dark:text-slate-400">
         <span className="flex items-center gap-1"><Check size={12} className="text-emerald-500" />all tasks done</span>
         <span className="flex items-center gap-1"><span className="size-2 rounded-full bg-amber-500" />unfinished</span>
         <span>Click a day to open it · drag a task onto another day to move it</span>
@@ -512,7 +524,7 @@ function BacklogTray({ tasks, onEdit }: { tasks: TodoItem[]; onEdit: (t: TodoIte
   if (!tasks.length) return null;
   return (
     <div className="card mt-4">
-      <div className="card-title flex items-center gap-1.5"><Inbox size={14} />Keep in todo · {tasks.length} <span className="text-xs font-normal text-slate-400">drag onto a day to schedule</span></div>
+      <div className="card-title flex items-center gap-1.5"><Inbox size={14} />Keep in todo · {tasks.length} <span className="text-xs font-normal text-slate-500 dark:text-slate-400">drag onto a day to schedule</span></div>
       <div className="flex flex-wrap gap-2">
         {tasks.map((t) => (
           <button key={t.id} {...dragProps(t.id)} onClick={() => onEdit(t)} className="max-w-xs cursor-grab truncate rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-sm text-slate-700 hover:bg-slate-100 dark:border-white/10 dark:bg-white/[.04] dark:text-slate-200">{t.title}</button>
@@ -531,30 +543,23 @@ function RangeSummary({ stats, tasks, today, range, chart }: { stats: DayStats[]
   const done = tasks.filter((t) => t.status === "done").length;
   const overdue = tasks.filter((t) => phaseOf(t, today) === "overdue").length;
   const planned = sum((s) => s.plannedMin);
-  const doneMin = sum((s) => s.doneMin);
   const focus = sum((s) => s.focusMin);
   const taskFocus = sum((s) => s.taskFocusMin);
-  const active = stats.filter((s) => s.done > 0 || s.focusMin > 0).length;
-  const best = [...stats].filter((s) => s.date <= today).sort((a, b) => b.doneMin + b.focusMin - (a.doneMin + a.focusMin))[0];
   const label = range === "day" ? "day" : range;
   const pct = (a: number, b: number) => (b ? `${Math.round((a / b) * 100)}%` : "–");
-  const bestVal = best ? best.doneMin + best.focusMin : 0;
 
   const cards: [string, string, string][] = [
     ["Tasks done", `${done}/${tasks.length}`, tasks.length ? `${pct(done, tasks.length)} complete` : "nothing scheduled"],
-    ["Planned time", fmtDur(planned), `${fmtDur(doneMin)} completed`],
     ["Focus time", fmtDur(focus), `${fmtDur(taskFocus)} on tasks · ${fmtDur(focus - taskFocus)} extra`],
     ["Overdue", String(overdue), overdue ? "needs a new day" : "all on track"],
-    ["Active days", String(active), `of ${stats.length}`],
-    ["Best day", bestVal > 0 ? shortDay(best.date) : "–", bestVal > 0 ? fmtDur(bestVal) : "no activity yet"],
   ];
   const data = stats.map((s) => ({ day: range === "week" ? weekday(s.date) : String(Number(s.date.slice(8))), Completed: +(s.doneMin / 60).toFixed(2), Remaining: +((s.plannedMin - s.doneMin) / 60).toFixed(2), Focus: +(s.focusMin / 60).toFixed(2) }));
 
   return (
     <div className={`mt-5 grid items-start gap-5 ${chart ? "xl:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]" : ""}`}>
-      <div className={`grid grid-cols-2 gap-3 ${chart ? "sm:grid-cols-3" : "sm:grid-cols-3 lg:grid-cols-6"}`}>
+      <div className={`grid grid-cols-2 gap-3 sm:grid-cols-3`}>
         {cards.map(([k, v, sub]) => (
-          <div key={k} className="stat"><div className="text-[11px] text-slate-500">{k}</div><div className="text-xl font-bold tabular-nums text-slate-900 dark:text-white">{v}</div><div className="text-[11px] text-slate-400">{sub}</div></div>
+          <div key={k} className="stat"><div className="text-xs text-slate-500 dark:text-slate-400">{k}</div><div className="text-xl font-bold tabular-nums text-slate-900 dark:text-white">{v}</div><div className="text-xs text-slate-500 dark:text-slate-400">{sub}</div></div>
         ))}
       </div>
       {chart && (
@@ -568,8 +573,9 @@ function RangeSummary({ stats, tasks, today, range, chart }: { stats: DayStats[]
                   <XAxis dataKey="day" fontSize={10} tickLine={false} axisLine={false} interval={range === "month" ? 1 : 0} />
                   <YAxis fontSize={10} tickLine={false} axisLine={false} width={24} />
                   <Tooltip cursor={{ fill: "rgba(99,102,241,.08)" }} formatter={(v) => `${v}h`} />
+                  <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12 }} />
                   <Bar dataKey="Completed" stackId="a" fill="#10b981" />
-                  <Bar dataKey="Remaining" stackId="a" fill="#c7d2fe" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="Remaining" stackId="a" fill="#a5b4fc" radius={[4, 4, 0, 0]} />
                   <Bar dataKey="Focus" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>

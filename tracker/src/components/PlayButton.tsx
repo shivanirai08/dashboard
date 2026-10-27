@@ -12,7 +12,7 @@ export default function PlayButton({ task, className = "" }: { task: TodoItem; c
   return (
     <button type="button" aria-label={label} title={live ? "Pause" : paused ? "Resume" : "Start focus"} aria-pressed={live}
       onClick={(e) => { e.stopPropagation(); if (live) p.pause(); else p.focusOnTask(task.id, task.title, task.subjects?.join(", ")); }}
-      className={`grid size-7 shrink-0 cursor-pointer place-items-center rounded-lg transition ${live ? "bg-brand-500 text-white" : "text-slate-400 hover:bg-brand-50 hover:text-brand-600 dark:hover:bg-white/10"} ${className}`}>
+      className={`grid size-7 shrink-0 cursor-pointer place-items-center rounded-lg transition ${live ? "bg-brand-600 text-white" : "text-slate-500 dark:text-slate-400 hover:bg-brand-50 hover:text-brand-600 dark:hover:bg-white/10"} ${className}`}>
       {live ? <Pause size={14} /> : <Play size={14} />}
     </button>
   );

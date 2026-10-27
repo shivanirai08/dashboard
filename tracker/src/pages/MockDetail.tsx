@@ -36,27 +36,27 @@ export default function MockDetail() {
   return (
     <div className="space-y-5">
       <div>
-        <Link to={mock.type === "test" || mock.type === "custom" ? `/mocks?kind=${mock.type}` : "/mocks"} className="mb-2 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-brand-600"><ArrowLeft size={14} />{mock.type === "test" ? "All subject tests" : mock.type === "custom" ? "All custom mocks" : "All full mocks"}</Link>
+        <Link to={mock.type === "test" || mock.type === "custom" ? `/mocks?kind=${mock.type}` : "/mocks"} className="mb-2 inline-flex items-center gap-1 text-sm text-slate-500 dark:text-slate-400 hover:text-brand-600"><ArrowLeft size={14} />{mock.type === "test" ? "All subject tests" : mock.type === "custom" ? "All custom mocks" : "All full mocks"}</Link>
         <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">{mock.name}</h1>
-        <p className="mt-1 text-sm text-slate-500">{formatDate(mock.date)} · {mock.source || "—"} · {mock.type === "test" ? `Test · ${mock.subjects?.[0] ?? "no subject"} · ${mock.wholeSubject || !mock.topics?.length ? "whole subject" : mock.topics.join(", ")}` : mock.type === "custom" ? `Custom (${mock.subjects?.join(", ") || "no subjects"})` : "Full mock"}{mock.timeMin ? ` · ${fmtDur(mock.timeMin)}` : ""}</p>
+        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{formatDate(mock.date)} · {mock.source || "—"} · {mock.type === "test" ? `Test · ${mock.subjects?.[0] ?? "no subject"} · ${mock.wholeSubject || !mock.topics?.length ? "whole subject" : mock.topics.join(", ")}` : mock.type === "custom" ? `Custom (${mock.subjects?.join(", ") || "no subjects"})` : "Full mock"}{mock.timeMin ? ` · ${fmtDur(mock.timeMin)}` : ""}</p>
       </div>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
         {stats.map(([l, v, s]) => (
-          <div key={l} className="stat"><div className="text-xs text-slate-500">{l}</div><div className="text-2xl font-bold text-slate-900 dark:text-white">{v}</div>{s && <div className="text-xs text-slate-400">{s}</div>}</div>
+          <div key={l} className="stat"><div className="text-xs text-slate-500 dark:text-slate-400">{l}</div><div className="text-2xl font-bold text-slate-900 dark:text-white">{v}</div>{s && <div className="text-xs text-slate-500 dark:text-slate-400">{s}</div>}</div>
         ))}
       </div>
 
       <div className="card">
         <div className="card-title">Question outcome</div>
         <div className="flex flex-wrap items-end gap-4">
-          {([["Correct", correct, "correct", "text-emerald-600"], ["Wrong", mock.wrong, "wrong", "text-rose-600"], ["Skipped", mock.skipped, "skipped", "text-slate-500"]] as const).map(([l, v, k, c]) => (
+          {([["Correct", correct, "correct", "text-emerald-600"], ["Wrong", mock.wrong, "wrong", "text-rose-600 dark:text-rose-400"], ["Skipped", mock.skipped, "skipped", "text-slate-500 dark:text-slate-400"]] as const).map(([l, v, k, c]) => (
             <label key={k}>
               <span className={`label ${c}`}>{l}</span>
               <input className="input !w-24" type="number" min={0} value={v ?? ""} placeholder={k === "wrong" ? String(sheetWrong) : k === "skipped" ? String(sheetSkipped) : "0"} onChange={(e) => patch({ [k]: num(e.target.value) })} />
             </label>
           ))}
-          <div className="text-sm text-slate-500">{(correct ?? 0) + wrong + skipped} questions · {wrong === sheetWrong ? "wrong rows match the sheet ✓" : `sheet has ${sheetWrong} wrong rows — log the rest below`}</div>
+          <div className="text-sm text-slate-500 dark:text-slate-400">{(correct ?? 0) + wrong + skipped} questions · {wrong === sheetWrong ? "wrong rows match the sheet ✓" : `sheet has ${sheetWrong} wrong rows — log the rest below`}</div>
         </div>
         <textarea className="input mt-4" rows={2} placeholder="Overall notes…" value={mock.notes} onChange={(e) => patch({ notes: e.target.value })} />
       </div>

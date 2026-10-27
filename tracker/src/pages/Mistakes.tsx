@@ -63,11 +63,11 @@ export default function Mistakes() {
       <button onClick={() => setFolder(f)} className={`flex min-w-0 flex-1 cursor-pointer items-center gap-2 px-2.5 py-1.5 text-left text-sm ${same(folder, f) ? "font-medium" : ""}`}>
         {icon !== false && (same(folder, f) ? <FolderOpen size={15} /> : <FolderClosed size={15} />)}
         <span className="min-w-0 flex-1 truncate">{label}</span>
-        <span className="text-xs text-slate-400">{n}</span>
+        <span className="text-xs text-slate-500 dark:text-slate-400">{n}</span>
       </button>
       {onDelete && (
         <button onClick={onDelete} aria-label={`Delete session ${label}`} title="Delete session"
-          className="mr-1 grid size-6 shrink-0 cursor-pointer place-items-center rounded-md text-slate-400 opacity-0 transition hover:bg-rose-100 hover:text-rose-600 focus-visible:opacity-100 group-hover:opacity-100 max-lg:opacity-100 dark:hover:bg-rose-500/15">
+          className="mr-1 grid size-6 shrink-0 cursor-pointer place-items-center rounded-md text-slate-500 dark:text-slate-400 opacity-0 transition hover:bg-rose-100 hover:text-rose-600 focus-visible:opacity-100 group-hover:opacity-100 max-lg:opacity-100 dark:hover:bg-rose-500/15">
           <Trash2 size={13} />
         </button>
       )}
@@ -84,17 +84,17 @@ export default function Mistakes() {
             <FolderBtn f={{ type: "none" }} label="Unsorted" n={count((m) => !m.mockId && !m.session)} />
           </div>
           <div>
-            <div className="mb-1 flex items-center gap-1.5 px-2.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400"><Trophy size={12} />Mocks</div>
+            <div className="mb-1 flex items-center gap-1.5 px-2.5 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400"><Trophy size={12} />Mocks</div>
             <div className="max-h-64 space-y-0.5 overflow-y-auto">
               {mocks.map((m) => <FolderBtn key={m.id} f={{ type: "mock", id: m.id }} label={m.name} n={count((x) => x.mockId === m.id)} />)}
-              {!mocks.length && <div className="px-2.5 text-xs text-slate-400">Log a mock first</div>}
+              {!mocks.length && <div className="px-2.5 text-xs text-slate-500 dark:text-slate-400">Log a mock first</div>}
             </div>
           </div>
           <div>
-            <div className="mb-1 flex items-center gap-1.5 px-2.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400"><Layers size={12} />Revision sessions</div>
+            <div className="mb-1 flex items-center gap-1.5 px-2.5 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400"><Layers size={12} />Revision sessions</div>
             <div className="max-h-56 space-y-0.5 overflow-y-auto">
               {sessions.map((s) => <FolderBtn key={s} f={{ type: "session", name: s }} label={s} n={count((x) => x.session === s)} onDelete={() => deleteSession(s)} />)}
-              {!sessions.length && <div className="px-2.5 text-xs text-slate-400">No sessions yet — create one below</div>}
+              {!sessions.length && <div className="px-2.5 text-xs text-slate-500 dark:text-slate-400">No sessions yet — create one below</div>}
             </div>
             <div className="mt-2 flex gap-1.5 px-1">
               <input className="input !py-1 text-xs" placeholder="New session…" value={newSession} onChange={(e) => setNewSession(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addSession()} />
@@ -106,7 +106,7 @@ export default function Mistakes() {
         <div className="min-w-0 space-y-5">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="mr-2 text-lg font-semibold text-slate-900 dark:text-white">{title}</h2>
-            {folder.type === "mock" && (() => { const m = state.mocks.find((x) => x.id === folder.id); return m ? <span className="text-sm text-slate-500">{formatDate(m.date)} · {m.score}/{m.maxScore}</span> : null; })()}
+            {folder.type === "mock" && (() => { const m = state.mocks.find((x) => x.id === folder.id); return m ? <span className="text-sm text-slate-500 dark:text-slate-400">{formatDate(m.date)} · {m.score}/{m.maxScore}</span> : null; })()}
             <div className="ml-auto flex flex-wrap items-center gap-2">
               <select className="input !w-auto" value={kind} onChange={(e) => setKind(e.target.value as MistakeKind | "")}>
                 <option value="">All reasons</option>{REASON_KEYS.map((k) => <option key={k} value={k}>{REASONS[k].label}</option>)}

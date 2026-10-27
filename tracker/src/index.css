@@ -1,13 +1,18 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&display=swap");
 @import "tailwindcss";
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Hanken Grotesk", ui-sans-serif, system-ui, sans-serif;
   --color-brand-50: #eef2ff;
+  --color-brand-300: #a5b4fc;
   --color-brand-500: #6366f1;
   --color-brand-600: #5457e6;
   --color-brand-700: #4338ca;
+  /* dark surfaces: ground < panel < raised */
+  --color-ground: #080b12;
+  --color-panel: #111522;
+  --color-raised: #151a2a;
 }
 
 html { color-scheme: light; }
@@ -17,13 +22,13 @@ select option { background-color: #fff; color: #0f172a; }
 
 body {
   margin: 0;
-  font-feature-settings: "cv11", "ss01";
-  @apply bg-[#f4f5fa] text-slate-700 antialiased dark:bg-[#080b12] dark:text-slate-300;
+  font-feature-settings: "tnum";
+  @apply bg-[#f4f5fa] text-slate-700 antialiased dark:bg-ground dark:text-slate-300;
   background-image: radial-gradient(900px 380px at 70% -120px, rgba(99, 102, 241, 0.13), transparent 70%);
   background-repeat: no-repeat;
 }
 button, a, summary, [role="button"], select, input[type="checkbox"] { -webkit-tap-highlight-color: transparent; }
-:focus-visible { outline: 2px solid var(--color-brand-500); outline-offset: 2px; border-radius: 6px; }
+:focus-visible { outline: 2px solid var(--color-brand-500); outline-offset: 2px; }
 input:focus-visible, select:focus-visible, textarea:focus-visible { outline: none; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
@@ -33,29 +38,41 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: non
 ::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.4); border-radius: 8px; border: 2px solid transparent; background-clip: content-box; }
 
 @layer components {
-  .card { @apply rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_1px_2px_rgba(16,24,40,.04)] dark:border-white/[.07] dark:bg-[#111522]; }
+  .card { @apply rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_1px_2px_rgba(16,24,40,.04)] dark:border-white/[.07] dark:bg-panel; }
   .card-title { @apply mb-3 text-sm font-semibold text-slate-900 dark:text-white; }
-  .btn { @apply inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-gradient-to-b from-brand-500 to-brand-600 px-3.5 py-2 text-sm font-medium text-white shadow-sm transition hover:brightness-110 active:scale-[.98] disabled:opacity-50; }
+  .btn { @apply inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-brand-600 px-3.5 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-brand-700 active:scale-[.98] disabled:opacity-50; }
   .btn-ghost { @apply inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 active:scale-[.98] dark:border-white/10 dark:bg-white/[.03] dark:text-slate-200 dark:hover:bg-white/[.07]; }
-  .icon-btn { @apply inline-flex size-8 cursor-pointer items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-rose-500 dark:hover:bg-white/10; }
-  .input { @apply w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-500/15 dark:border-white/10 dark:bg-white/[.04] dark:text-slate-100 dark:focus:bg-white/[.06]; }
+  .icon-btn { @apply inline-flex size-8 cursor-pointer items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-white; }
+  .input { @apply w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-brand-500 focus:bg-white focus:ring-2 focus:ring-brand-500/40 dark:border-white/10 dark:bg-white/[.04] dark:text-slate-100 dark:focus:bg-white/[.06]; }
   .label { @apply mb-1 block text-xs font-medium text-slate-500; }
   .chip { @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium; }
-  .th { @apply px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400; }
+  .th { @apply px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400; }
   .td { @apply px-4 py-3 text-sm; }
 }
 
 /* ---------- spreadsheet-style tables ---------- */
 @layer components {
-  .sheet-wrap { @apply overflow-auto rounded-xl border border-slate-200 bg-white dark:border-white/[.08] dark:bg-[#0f1320]; }
+  .sheet-wrap { @apply overflow-auto rounded-xl border border-slate-200 bg-white dark:border-white/[.08] dark:bg-panel; }
   .sheet { @apply w-full border-separate border-spacing-0 text-sm tabular-nums; }
-  .sheet thead th { @apply sticky top-0 z-[1] whitespace-nowrap border-b border-r border-slate-200 bg-slate-50 px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 last:border-r-0 dark:border-white/[.08] dark:bg-[#151a2a]; }
+  .sheet thead th { @apply sticky top-0 z-[1] whitespace-nowrap border-b border-r border-slate-200 bg-slate-50 px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 last:border-r-0 dark:border-white/[.08] dark:bg-raised; }
   .sheet tbody td { @apply border-b border-r border-slate-100 p-0 last:border-r-0 dark:border-white/[.05]; }
   .sheet tbody tr:hover td { @apply bg-slate-50/70 dark:bg-white/[.02]; }
-  .sheet tfoot td { @apply bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600 dark:bg-[#151a2a] dark:text-slate-300; }
+  .sheet tfoot td { @apply bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600 dark:bg-raised dark:text-slate-300; }
   .cell { @apply block w-full min-w-0 bg-transparent px-3 py-2 text-sm text-slate-800 outline-none placeholder:text-slate-300 focus:bg-brand-50 focus:ring-2 focus:ring-inset focus:ring-brand-500/50 dark:text-slate-200 dark:placeholder:text-slate-600 dark:focus:bg-brand-500/10; }
-  .stat { @apply rounded-xl border border-slate-200 bg-white px-4 py-3 dark:border-white/[.07] dark:bg-[#121623]; }
+  .stat { @apply rounded-xl border border-slate-200 bg-white px-4 py-3 dark:border-white/[.07] dark:bg-panel; }
 }
 
 @keyframes pop-in { from { opacity: 0; transform: translateY(6px) scale(.98); } to { opacity: 1; transform: none; } }
 .pop-in { animation: pop-in .2s ease-out; }
+
+/* charts follow the theme */
+.recharts-default-tooltip { border-radius: 10px !important; border-color: rgba(148, 163, 184, 0.35) !important; }
+.dark .recharts-default-tooltip { background-color: var(--color-raised) !important; border-color: rgba(255, 255, 255, 0.1) !important; }
+.dark .recharts-tooltip-item, .dark .recharts-tooltip-label { color: #e2e8f0 !important; }
+.dark .recharts-cartesian-axis-tick-value { fill: #94a3b8; }
+
+/* touch: grow small icon buttons to a comfortable hit area without changing layout */
+@media (pointer: coarse) {
+  .icon-btn { position: relative; }
+  .icon-btn::after { content: ""; position: absolute; inset: -8px; }
+}

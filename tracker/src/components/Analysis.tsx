@@ -34,7 +34,7 @@ export function ReasonBreakdown({ rows }: { rows: Mistake[] }) {
 export function SubjectMatrix({ rows }: { rows: Mistake[] }) {
   const subjects = [...new Set(rows.map((m) => m.subject))].sort();
   const max = Math.max(1, ...subjects.flatMap((s) => REASON_KEYS.map((k) => rows.filter((m) => m.subject === s && m.kind === k).length)));
-  if (!subjects.length) return <div className="py-8 text-center text-sm text-slate-400">No data yet</div>;
+  if (!subjects.length) return <div className="py-8 text-center text-sm text-slate-500 dark:text-slate-400">No data yet</div>;
   return (
     <div className="sheet-wrap">
       <table className="sheet">

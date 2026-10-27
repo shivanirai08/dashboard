@@ -39,6 +39,9 @@ export default function TaskDialog({ draft, onClose, onDelete }: { draft: TaskDr
   const [logged, setLogged] = useState<number | undefined>(draft.timeMin ?? 0);
   const [err, setErr] = useState("");
   const titleRef = useRef<HTMLInputElement>(null);
+  const errRef = useRef<HTMLDivElement>(null);
+  // the error sits at the bottom of a scrolling body; bring it into view
+  useEffect(() => { if (err) errRef.current?.scrollIntoView({ block: "nearest" }); }, [err]);
 
   // onClose is a new function every render and the focus timer re-renders the page each second;
   // keep it in a ref so focus is set once and typing isn't interrupted
@@ -46,7 +49,7 @@ export default function TaskDialog({ draft, onClose, onDelete }: { draft: TaskDr
   closeRef.current = onClose;
   useEffect(() => {
     titleRef.current?.focus();
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && closeRef.current();
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && !document.getElementById("task-notes-title") && closeRef.current();
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
@@ -88,14 +91,14 @@ export default function TaskDialog({ draft, onClose, onDelete }: { draft: TaskDr
     if (v && start && end) setEnd(fromMin(toMin(v) + (toMin(end) - toMin(start))));
   };
 
-  const seg = (on: boolean) => `flex cursor-pointer items-center justify-center gap-1.5 rounded-lg py-1.5 text-sm transition ${on ? "bg-brand-500 text-white shadow-sm" : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"}`;
+  const seg = (on: boolean) => `flex cursor-pointer items-center justify-center gap-1.5 rounded-lg py-1.5 text-sm transition ${on ? "bg-brand-600 text-white shadow-sm" : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"}`;
   const segWrap = "grid grid-cols-2 gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1 dark:border-white/10 dark:bg-white/[.03]";
   const rows = isNew ? [] : dailyContribution(state, draft as TodoItem);
   const total = rows.reduce((a, r) => a + r.min, 0);
 
   return (
-    <div className="fixed inset-0 z-40 grid place-items-end bg-slate-900/50 p-0 backdrop-blur-sm sm:place-items-center sm:p-4" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <form role="dialog" aria-modal="true" aria-labelledby="task-dialog-title" onSubmit={submit} className="card flex max-h-[92vh] w-full max-w-lg flex-col !rounded-b-none !p-0 shadow-2xl sm:!rounded-b-2xl">
+    <div className="fixed inset-0 z-40 grid place-items-end bg-slate-900/50 p-0 sm:place-items-center sm:p-4" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <form role="dialog" aria-modal="true" aria-labelledby="task-dialog-title" onSubmit={submit} className="card flex max-h-[92dvh] w-full max-w-lg flex-col !rounded-b-none !p-0 shadow-2xl sm:!rounded-b-2xl">
         <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-3.5 dark:border-white/[.06]">
           <h2 id="task-dialog-title" className="text-base font-semibold text-slate-900 dark:text-white">{isNew ? (isRev ? "New revision" : "New task") : isRev ? "Edit revision" : "Edit task"}</h2>
           <button type="button" className="icon-btn hover:!text-slate-700" aria-label="Close" onClick={onClose}><X size={16} /></button>
@@ -135,7 +138,7 @@ export default function TaskDialog({ draft, onClose, onDelete }: { draft: TaskDr
                 </div>
               )}
             </div>
-            {!scheduled && <p className="text-xs text-slate-400">Not decided yet — it waits in the backlog until you give it a day.</p>}
+            {!scheduled && <p className="text-xs text-slate-500 dark:text-slate-400">Not decided yet — it waits in the backlog until you give it a day.</p>}
 
             {scheduled && (
               <>
@@ -145,23 +148,23 @@ export default function TaskDialog({ draft, onClose, onDelete }: { draft: TaskDr
                   <Field label="End"><input type="time" className="input" step={300} value={end} disabled={!start} onChange={(e) => { setEnd(e.target.value); setErr(""); }} /></Field>
                 </div>
                 <div className="flex flex-wrap items-center gap-1.5" aria-label="Duration presets">
-                  <span className="text-xs text-slate-400">Length</span>
+                  <span className="text-xs text-slate-500 dark:text-slate-400">Length</span>
                   {[30, 60, 90, 120].map((m) => (
                     <button key={m} type="button" className="chip cursor-pointer border border-slate-200 hover:bg-slate-100 dark:border-white/10 dark:hover:bg-white/10"
                       onClick={() => { const st = start || nowHM(); setStart(st); setEnd(fromMin(toMin(st) + m)); }}>{fmtDur(m)}</button>
                   ))}
                 </div>
-                {!start && <p className="text-xs text-slate-400">{isRev ? "All-day revision — add a start time to put it on the time grid." : `No start time? It’s placed at the current time (${nowHM()}) for an hour.`}</p>}
+                {!start && <p className="text-xs text-slate-500 dark:text-slate-400">{isRev ? "All-day revision — add a start time to put it on the time grid." : `No start time? It’s placed at the current time (${nowHM()}) for an hour.`}</p>}
                 {isRev ? null : showDue ? (
                   <Field label="Deadline (for tasks that take several days)">
                     <div className="flex gap-2">
                       <input type="date" className="input" min={date} value={due} onChange={(e) => { setDue(e.target.value); setErr(""); }} />
                       <button type="button" className="btn-ghost" onClick={() => { setShowDue(false); setDue(""); }}>Remove</button>
                     </div>
-                    <p className="mt-1 text-xs text-slate-400">In progress every day from the date until this deadline; overdue after.</p>
+                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">In progress every day from the date until this deadline; overdue after.</p>
                   </Field>
                 ) : (
-                  <button type="button" className="cursor-pointer text-xs font-medium text-brand-600 hover:underline" onClick={() => setShowDue(true)}>+ Add a later deadline</button>
+                  <button type="button" className="cursor-pointer text-xs font-medium text-brand-600 dark:text-brand-300 hover:underline" onClick={() => setShowDue(true)}>+ Add a later deadline</button>
                 )}
               </>
             )}
@@ -171,7 +174,7 @@ export default function TaskDialog({ draft, onClose, onDelete }: { draft: TaskDr
             <section className="grid grid-cols-2 gap-3 rounded-2xl border border-slate-200 p-3.5 dark:border-white/10">
               <Field label="Repeats every"><select className="input" value={interval} onChange={(e) => setInterval(Number(e.target.value))}>{[1, 3, 7, 14, 30, 60].map((d) => <option key={d} value={d}>{d} day{d > 1 ? "s" : ""}</option>)}</select></Field>
               <Field label="Notes"><input className="input" placeholder="Recall hints" value={revNotes} onChange={(e) => setRevNotes(e.target.value)} /></Field>
-              <p className="col-span-2 text-xs text-slate-400">Finishing it books the next review further out (1 → 3 → 7 → 14 → 30 → 60 days); “forgot” books it for tomorrow.</p>
+              <p className="col-span-2 text-xs text-slate-500 dark:text-slate-400">Finishing it books the next review further out (1 → 3 → 7 → 14 → 30 → 60 days); “forgot” books it for tomorrow.</p>
             </section>
           )}
 
@@ -186,21 +189,21 @@ export default function TaskDialog({ draft, onClose, onDelete }: { draft: TaskDr
                   {rows.map((r) => (
                     <li key={r.date} className="flex items-center gap-2 px-3 py-1.5">
                       <span className="chip bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-slate-300">Day {r.day}</span>
-                      <span className="text-slate-500">{formatDate(r.date)}</span>
-                      <span className={`ml-auto tabular-nums ${r.min ? "font-medium text-slate-900 dark:text-white" : "text-slate-400"}`}>{r.min ? fmtDur(r.min) : "–"}</span>
+                      <span className="text-slate-500 dark:text-slate-400">{formatDate(r.date)}</span>
+                      <span className={`ml-auto tabular-nums ${r.min ? "font-medium text-slate-900 dark:text-white" : "text-slate-500 dark:text-slate-400"}`}>{r.min ? fmtDur(r.min) : "–"}</span>
                     </li>
                   ))}
-                  <li className="flex items-center px-3 py-1.5 text-xs font-semibold text-slate-500"><span>Total focused</span><span className="ml-auto tabular-nums">{fmtDur(total)}</span></li>
+                  <li className="flex items-center px-3 py-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400"><span>Total focused</span><span className="ml-auto tabular-nums">{fmtDur(total)}</span></li>
                 </ul>
               )}
             </section>
           )}
 
-          {err && <div role="alert" className="text-sm text-rose-600">{err}</div>}
+          {err && <div ref={errRef} role="alert" className="text-sm font-medium text-rose-600 dark:text-rose-400">{err}</div>}
         </div>
 
         <div className="flex items-center gap-2 border-t border-slate-100 px-5 py-3 dark:border-white/[.06]">
-          {!isNew && <button type="button" className="icon-btn !size-9 hover:!text-rose-600" aria-label="Delete task" title="Delete task" onClick={() => onDelete(draft as TodoItem)}><Trash2 size={16} /></button>}
+          {!isNew && <button type="button" className="icon-btn !size-9 hover:!text-rose-600 dark:text-rose-400" aria-label="Delete task" title="Delete task" onClick={() => onDelete(draft as TodoItem)}><Trash2 size={16} /></button>}
           <button type="button" className="btn-ghost ml-auto" onClick={onClose}>Cancel</button>
           <button type="submit" className="btn">{isNew ? (isRev ? "Add revision" : "Add task") : "Save"}</button>
         </div>

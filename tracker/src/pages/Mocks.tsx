@@ -85,7 +85,7 @@ export default function Mocks() {
           const on = k === kind;
           return (
             <button key={k} role="tab" aria-selected={on} onClick={() => switchKind(k)}
-              className={`flex cursor-pointer items-center gap-2 whitespace-nowrap rounded-lg px-4 py-2 text-sm font-medium transition ${on ? "text-white shadow-sm" : "text-slate-500 hover:text-slate-900 dark:hover:text-white"}`}
+              className={`flex cursor-pointer items-center gap-2 whitespace-nowrap rounded-lg px-4 py-2 text-sm font-medium transition ${on ? "text-white shadow-sm" : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"}`}
               style={on ? { background: KIND_META[k].color } : undefined}>
               <Icon size={15} />{KIND_META[k].label}<span className={`rounded-full px-1.5 text-xs ${on ? "bg-white/25" : "bg-slate-100 dark:bg-white/10"}`}>{count}</span>
             </button>

@@ -10,6 +10,7 @@ import {
 } from "react";
 import { bundledCatalog } from "./catalog";
 import { supabase } from "./supabase";
+import { restoreMultiDayStarts } from "./tasks";
 import type { AppState, Catalog } from "./types";
 
 const KEY = "gate-cs-tracker-v2";
@@ -58,10 +59,25 @@ function migrateBlocks(blocks: AppState["schedule"], todos: AppState["todos"]): 
   return out;
 }
 
+const REPAIR_KEY = "gate-repair-multiday-v1";
+
 function load(): AppState {
   try {
     const raw = localStorage.getItem(KEY);
-    return raw ? normalize(JSON.parse(raw) as AppState) : empty;
+    if (!raw) return empty;
+    const state = normalize(JSON.parse(raw) as AppState);
+    // once: bring multi-day tasks that were pulled forward back to their real start day.
+    // The raw save is copied aside first and the flag is only set after the repair worked.
+    if (localStorage.getItem(REPAIR_KEY)) return state;
+    try {
+      localStorage.setItem(`${KEY}-backup-premultiday`, raw);
+      const fixed = restoreMultiDayStarts(state);
+      if (fixed !== state) persist(fixed);
+      localStorage.setItem(REPAIR_KEY, "1");
+      return fixed;
+    } catch {
+      return state;
+    }
   } catch {
     return empty;
   }

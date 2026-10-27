@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
-import { CheckCircle2, Clock, Flame, ListTodo, Plus, RotateCcw, Target, TriangleAlert } from "lucide-react";
+import { CheckCircle2, Flame, ListTodo, Plus, RotateCcw, Target } from "lucide-react";
 import { useStore } from "../lib/store";
 import { formatClock, usePomodoro } from "../lib/pomodoro";
 import TimerControls from "../components/TimerControls";
@@ -33,18 +33,15 @@ export default function Dashboard() {
     else if (i !== days.length - 1) break;
   }
 
-  const planToday = tasksOn(state, today, today);
-  const tasksDone = planToday.filter((t) => t.status === "done").length;
   const dueRev = state.todos.filter((t) => t.revision && t.status !== "done" && (t.planned ?? today) <= today);
   const openMistakes = state.mistakes.filter((m) => !m.resolved).length;
   const lastMock = [...state.mocks].sort((a, b) => b.date.localeCompare(a.date))[0];
   const left = state.examDate ? daysUntil(state.examDate) : null;
   const hour = new Date().getHours();
-  const tiles = [
-    { label: "Tasks today", value: planToday.length ? `${tasksDone}/${planToday.length}` : "0", to: "/schedule", tone: "from-emerald-500 to-teal-500", icon: ListTodo },
-    { label: "Focus today", value: fmtDur(todayMin), sub: `goal ${fmtDur(goal)}`, to: "/schedule", tone: "from-indigo-500 to-violet-500", icon: Clock },
-    { label: "Revisions due", value: dueRev.length, to: "/revision", tone: "from-amber-500 to-orange-500", icon: RotateCcw },
-    { label: "Open mistakes", value: openMistakes, to: "/mistakes", tone: "from-rose-500 to-pink-500", icon: TriangleAlert },
+  const tiles: { label: string; value: string | number; sub?: string; to: string; dot: string; progress?: number }[] = [
+    { label: "Focus today", value: fmtDur(todayMin), sub: `of ${fmtDur(goal)}`, to: "/schedule", dot: "bg-brand-500" },
+    { label: "Revisions due", value: dueRev.length, to: "/revision", dot: "bg-amber-500" },
+    { label: "Open mistakes", value: openMistakes, to: "/mistakes", dot: "bg-rose-500" },
   ];
 
   const topReasons = REASON_KEYS.map((k) => ({ k, n: state.mistakes.filter((m) => m.kind === k).length })).filter((x) => x.n).sort((x, y) => y.n - x.n);
@@ -52,29 +49,31 @@ export default function Dashboard() {
 
   return (
     <>
-      <PageHeader title={`Good ${hour < 12 ? "morning" : hour < 18 ? "afternoon" : "evening"}`} sub={left !== null ? `${left} days to ${catalog.target}` : `Preparing for ${catalog.target} · set your exam date in Settings`} />
+      <PageHeader title={left !== null ? `${left} day${left === 1 ? "" : "s"} to ${catalog.target}` : `Preparing for ${catalog.target}`} sub={`Good ${hour < 12 ? "morning" : hour < 18 ? "afternoon" : "evening"}${left === null ? " · set your exam date in Settings" : ""}`} />
 
       <div className="space-y-5">
         <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
-          <div className="flex min-w-0 flex-col gap-5">
-            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <div className="flex min-w-0 flex-col gap-5 max-xl:contents">
+            <div className="max-xl:order-1"><NowBand /></div>
+
+            <div className="card grid grid-cols-3 max-xl:order-3 divide-x divide-slate-100 !p-0 dark:divide-white/[.06]">
               {tiles.map((t) => (
-                <Link key={t.label} to={t.to} className="card group relative overflow-hidden !p-4 transition hover:-translate-y-0.5 hover:shadow-md focus-visible:ring-4 focus-visible:ring-brand-500/30">
-                  <div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${t.tone}`} />
-                  <div className="flex items-center justify-between"><span className="text-xs font-medium text-slate-500">{t.label}</span><t.icon size={16} className="text-slate-300 transition-colors group-hover:text-brand-500 dark:text-slate-600" aria-hidden /></div>
-                  <div className="mt-1 flex items-baseline gap-2"><span className="text-3xl font-bold tabular-nums text-slate-900 dark:text-white">{t.value}</span>{t.sub && <span className="text-xs text-slate-400">{t.sub}</span>}</div>
+                <Link key={t.label} to={t.to} className={`block px-3 py-3.5 sm:px-4 transition hover:bg-slate-50 focus-visible:bg-slate-50 dark:hover:bg-white/[.03] `}>
+                  <div className="flex items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400"><span className={`size-1.5 rounded-full ${t.dot}`} aria-hidden />{t.label}</div>
+                  <div className="mt-1 flex flex-wrap items-baseline gap-x-2"><span className="whitespace-nowrap text-xl font-semibold tabular-nums tracking-tight sm:text-2xl text-slate-900 dark:text-white">{t.value}</span>{t.sub && <span className="hidden whitespace-nowrap text-xs sm:inline text-slate-500 dark:text-slate-400">{t.sub}</span>}</div>
                 </Link>
               ))}
             </div>
 
-            <TodayPlan />
+            <div className="max-xl:order-4"><TodayPlan /></div>
 
-            <div className="grid gap-5 lg:grid-cols-3">
+            <div className="grid gap-5 max-xl:order-5 lg:grid-cols-2">
               <div className="card lg:col-span-2">
                 <div className="mb-3 flex items-center justify-between">
                   <div className="card-title !mb-0">Focus minutes · last 14 days</div>
                   <span className="chip bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-300"><Flame size={12} className="mr-1" />{streak}-day streak</span>
                 </div>
+                {series.some((x) => x.min > 0) ? (
                 <ResponsiveContainer width="100%" height={170}>
                   <BarChart data={series}>
                     <XAxis dataKey="day" fontSize={10} tickLine={false} axisLine={false} interval={1} />
@@ -82,6 +81,7 @@ export default function Dashboard() {
                     <Bar dataKey="min" fill="#6366f1" radius={[6, 6, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
+                ) : <Empty icon={<Flame />} text="No focus time logged in the last 14 days" />}
               </div>
 
               <div className="card">
@@ -89,34 +89,32 @@ export default function Dashboard() {
                 {lastMock ? (
                   <Link to={`/mocks/${lastMock.id}`} className="block">
                     <div className="text-4xl font-bold tabular-nums text-slate-900 dark:text-white">{Math.round((lastMock.score / lastMock.maxScore) * 100)}%</div>
-                    <div className="mt-1 text-sm text-brand-600">{lastMock.name} →</div>
-                    <div className="text-xs text-slate-500">{formatDate(lastMock.date)} · {lastMock.score}/{lastMock.maxScore}</div>
+                    <div className="mt-1 text-sm text-brand-600 dark:text-brand-300">{lastMock.name} →</div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400">{formatDate(lastMock.date)} · {lastMock.score}/{lastMock.maxScore}</div>
                     {lastMock.weakSubjects.length > 0 && <div className="mt-3 flex flex-wrap gap-1">{lastMock.weakSubjects.map((s) => <span key={s} className="chip bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300">{s}</span>)}</div>}
                   </Link>
                 ) : <Empty icon={<Target />} text="No mock logged yet" />}
               </div>
+
+              <div className="card">
+                <div className="card-title flex items-center justify-between">Why I lose marks <Link to="/mistakes" className="text-xs font-normal text-brand-600 dark:text-brand-300 hover:underline">open log →</Link></div>
+                {topReasons.length ? (
+                  <div className="space-y-2.5">
+                    {topReasons.map(({ k, n }) => (
+                      <div key={k}>
+                        <div className="mb-1 flex justify-between text-xs"><span>{REASONS[k].label}</span><span className="tabular-nums text-slate-500 dark:text-slate-400">{n}</span></div>
+                        <div className="h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-white/10"><div className="h-full rounded-full" style={{ width: `${(n / maxReason) * 100}%`, background: REASONS[k].bar }} /></div>
+                      </div>
+                    ))}
+                  </div>
+                ) : <Empty icon={<Target />} text="Log mistakes to see patterns" />}
+              </div>
             </div>
           </div>
 
-          <div className="space-y-5 xl:sticky xl:top-4">
-            <FocusNow />
-            <QuickAdd />
-          </div>
-        </div>
-
-        <div className="grid items-start gap-5">
-          <div className="card">
-            <div className="card-title flex items-center justify-between">Why I lose marks <Link to="/mistakes" className="text-xs font-normal text-brand-600">open log →</Link></div>
-            {topReasons.length ? (
-              <div className="space-y-2.5">
-                {topReasons.map(({ k, n }) => (
-                  <div key={k}>
-                    <div className="mb-1 flex justify-between text-xs"><span>{REASONS[k].label}</span><span className="tabular-nums text-slate-500">{n}</span></div>
-                    <div className="h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-white/10"><div className="h-full rounded-full" style={{ width: `${(n / maxReason) * 100}%`, background: REASONS[k].bar }} /></div>
-                  </div>
-                ))}
-              </div>
-            ) : <Empty icon={<Target />} text="Log mistakes to see patterns" />}
+          <div className="space-y-5 max-xl:contents xl:sticky xl:top-4">
+            <div className="max-xl:order-2"><FocusNow /></div>
+            <div className="max-xl:order-6"><QuickAdd /></div>
           </div>
         </div>
       </div>
@@ -129,7 +127,7 @@ function TodayPlan() {
   const { state } = useStore();
   const { toggleDone } = useTasks();
   const today = todayISO();
-  const now = new Date();
+  const now = useMinute();
   const nowMin = now.getHours() * 60 + now.getMinutes();
 
   const plan = tasksOn(state, today, today);
@@ -147,11 +145,11 @@ function TodayPlan() {
         {tasks.length > 0 && (
           <div className="flex min-w-32 max-w-56 flex-1 items-center gap-2" title={`${done} of ${tasks.length} done`}>
             <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100 dark:bg-white/10" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label="Today's progress"><div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${pct}%` }} /></div>
-            <span className="text-xs tabular-nums text-slate-500">{done}/{tasks.length}</span>
+            <span className="text-xs tabular-nums text-slate-500 dark:text-slate-400">{done}/{tasks.length}</span>
           </div>
         )}
         <div className="ml-auto flex items-center gap-3 text-xs">
-          <Link to="/schedule" className="text-brand-600">Open schedule →</Link>
+          <Link to="/schedule" className="text-brand-600 dark:text-brand-300">Open schedule →</Link>
           <Link to="/schedule?new=1" className="btn !px-2.5 !py-1 !text-xs"><Plus size={13} />New task</Link>
         </div>
       </div>
@@ -164,31 +162,31 @@ function TodayPlan() {
         const live = !isDone && own && toMin(t.start!) <= nowMin && nowMin < toMin(t.end!);
         return (
           <div key={t.id} className={`flex items-center gap-2.5 border-b border-slate-100 py-2 text-sm last:border-0 dark:border-white/5 ${live ? "-mx-2 rounded-lg bg-brand-50 px-2 dark:bg-brand-500/10" : ""}`}>
-            <input type="checkbox" className="size-4 shrink-0 cursor-pointer accent-indigo-600" checked={isDone} aria-label={`Mark ${t.title} ${isDone ? "not done" : "done"}`} onChange={() => toggleDone(t)} />
-            <div className="w-16 shrink-0 text-xs tabular-nums text-slate-400">{own ? clock12(t.start!) : "all day"}</div>
+            <input type="checkbox" className="size-4 shrink-0 cursor-pointer accent-emerald-600" checked={isDone} aria-label={`Mark ${t.title} ${isDone ? "not done" : "done"}`} onChange={() => toggleDone(t)} />
+            <div className="w-16 shrink-0 text-xs tabular-nums text-slate-500 dark:text-slate-400">{own ? clock12(t.start!) : "all day"}</div>
             <div className="min-w-0 flex-1">
-              <div className={`truncate ${isDone ? "text-slate-400 line-through" : "text-slate-900 dark:text-white"}`}>{t.title}</div>
-              <div className="flex flex-wrap gap-x-2 text-[11px] text-slate-400">
-                {late && <span className="font-medium text-rose-500">{-daysUntil(t.due ?? t.planned ?? today)}d overdue</span>}
-                {counter && <span className="text-indigo-500">{counter}</span>}
+              <div className={`line-clamp-2 break-words ${isDone ? "text-slate-500 dark:text-slate-400 line-through" : "text-slate-900 dark:text-white"}`}>{t.title}</div>
+              <div className="flex flex-wrap gap-x-2 text-xs text-slate-500 dark:text-slate-400">
+                {late && <span className="font-medium text-rose-600 dark:text-rose-400">{-daysUntil(t.due ?? t.planned ?? today)}d overdue</span>}
+                {counter && <span className="text-indigo-600 dark:text-indigo-300">{counter}</span>}
                 {t.due && !late && !isDone && t.due !== t.planned && <span>due {daysUntil(t.due) === 0 ? "today" : formatDate(t.due)}</span>}
-                {t.revision && <span className="inline-flex items-center gap-0.5 text-amber-600"><RotateCcw size={10} aria-hidden />revision · every {t.revision.intervalDays}d</span>}
+                {t.revision && <span className="inline-flex items-center gap-0.5 text-amber-700 dark:text-amber-400"><RotateCcw size={10} aria-hidden />revision · every {t.revision.intervalDays}d</span>}
                 {!!t.subjects?.length && <span>{t.subjects.join(", ")}</span>}
-                {!!t.timeMin && <span>⏱ {fmtDur(t.timeMin)}{plannedMin(t) > 0 && ` / ${fmtDur(plannedMin(t))}`}</span>}
+                {!!t.timeMin && <span>{fmtDur(t.timeMin)} focused{plannedMin(t) > 0 && ` / ${fmtDur(plannedMin(t))}`}</span>}
               </div>
             </div>
-            {live && <span className="chip bg-brand-500 text-white">now</span>}
+            {live && <span className="chip bg-brand-600 text-white">now</span>}
             <PlayButton task={t} />
           </div>
         );
       }) : <Empty icon={<CheckCircle2 />} text="Nothing planned for today — add a task to get going" />}
-      {tasks.length > 8 && <div className="pt-2 text-xs text-slate-400">+{tasks.length - 8} more on the schedule</div>}
+      {tasks.length > 8 && <div className="pt-2 text-xs text-slate-500 dark:text-slate-400">+{tasks.length - 8} more on the schedule</div>}
 
       {(comingUp.length > 0 || backlog.length > 0) && (
-        <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3 text-xs text-slate-500 dark:border-white/5">
-          {comingUp.length > 0 && <span className="font-semibold uppercase tracking-wider text-slate-400">Coming up</span>}
+        <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3 text-xs text-slate-500 dark:text-slate-400 dark:border-white/5">
+          {comingUp.length > 0 && <span className="font-semibold text-slate-600 dark:text-slate-300">Coming up</span>}
           {comingUp.map((t) => <span key={t.id} className="chip bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-slate-300">{t.title} · {daysUntil(startOf(t) ?? today) === 1 ? "tomorrow" : formatDate(startOf(t) ?? today)}</span>)}
-          {backlog.length > 0 && <Link to="/schedule" className="ml-auto text-brand-600">{backlog.length} waiting in todo →</Link>}
+          {backlog.length > 0 && <Link to="/schedule" className="ml-auto text-brand-600 dark:text-brand-300">{backlog.length} waiting in todo →</Link>}
         </div>
       )}
     </div>
@@ -205,9 +203,7 @@ function FocusNow() {
   const onTasks = sessions.filter((x) => x.taskId).reduce((a, x) => a + x.minutes, 0);
   const live = Math.floor(p.elapsed / 60);
   const pct = Math.min(100, Math.round(((logged + live) / goal) * 100));
-  const R = 52, C = 2 * Math.PI * R;
-  const frac = (p.elapsed % 3600) / 3600; // one lap per hour
-  const color = p.running ? "#6366f1" : "#94a3b8";
+  const color = p.running ? "#6366f1" : "#64748b";
   const task = p.taskId ? state.todos.find((t) => t.id === p.taskId) : undefined;
   const choices = tasksOn(state, todayD, todayD).filter((t) => t.status !== "done");
   if (task && !choices.some((t) => t.id === task.id)) choices.push(task);
@@ -216,20 +212,14 @@ function FocusNow() {
     <div className="card">
       <div className="card-title">Focus now</div>
       <div className="flex items-center gap-4">
-        <div className="relative size-32 shrink-0">
-          <svg viewBox="0 0 120 120" className="size-full -rotate-90" aria-hidden>
-            <circle cx="60" cy="60" r={R} fill="none" stroke="currentColor" strokeWidth="8" className="text-slate-100 dark:text-white/5" />
-            <circle cx="60" cy="60" r={R} fill="none" stroke={color} strokeWidth="8" strokeLinecap="round" strokeDasharray={C} strokeDashoffset={C - C * frac} style={{ transition: "stroke-dashoffset 1s linear" }} />
-          </svg>
-          <div className="absolute inset-0 grid place-content-center text-center">
-            <div className="text-[10px] font-semibold uppercase tracking-widest" style={{ color }}>{p.running ? "focusing" : p.started ? "paused" : "ready"}</div>
-            <div className="font-mono text-2xl font-bold text-slate-900 dark:text-white" role="timer">{formatClock(p.elapsed)}</div>
-          </div>
+        <div className="shrink-0">
+          <div className="text-xs font-semibold" style={{ color }}>{p.running ? "Focusing" : p.started ? "Paused" : "Ready"}</div>
+          <div className="font-mono text-4xl font-bold tabular-nums tracking-tight text-slate-900 dark:text-white" role="timer">{formatClock(p.elapsed)}</div>
         </div>
         <div className="min-w-0 flex-1 space-y-2.5">
           <TimerControls />
-          <div className="text-xs text-slate-400">{p.started ? "End logs the time." : "Counts up from when you press start."}</div>
-          {task && <div className="text-xs text-indigo-500">{fmtDur((task.timeMin ?? 0) + live)} logged{est > 0 && ` of ${fmtDur(est)}`}</div>}
+          <div className="text-xs text-slate-500 dark:text-slate-400">{p.started ? "End logs the time." : "Counts up from when you press start."}</div>
+          {task && <div className="text-xs text-indigo-600 dark:text-indigo-300">{fmtDur((task.timeMin ?? 0) + live)} logged{est > 0 && ` of ${fmtDur(est)}`}</div>}
         </div>
       </div>
       <label className="mt-3 block">
@@ -238,7 +228,7 @@ function FocusNow() {
           <option value="">Extra study (not a task)</option>
           {choices.map((t) => <option key={t.id} value={t.id}>{t.start && t.planned === todayD ? `${clock12(t.start)} · ` : ""}{t.title}</option>)}
         </select>
-        {p.started && <span className="mt-1 block text-xs text-slate-400">End the session to switch task.</span>}
+        {p.started && <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">End the session to switch task.</span>}
       </label>
       {!p.taskId && (
         <div className="mt-2 flex gap-2">
@@ -248,10 +238,10 @@ function FocusNow() {
           </select>
         </div>
       )}
-      {!p.taskId && <p className="mt-1.5 text-xs text-slate-400">Extra sessions only show in today’s session log; they don’t count toward any task.</p>}
+      {!p.taskId && <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">Extra sessions only show in today’s session log; they don’t count toward any task.</p>}
       <div className="mt-3">
-        <div className="mb-1 flex justify-between text-xs text-slate-500"><span>Daily goal</span><span>{fmtDur(logged + live)} / {fmtDur(goal)}{onTasks > 0 && ` · ${fmtDur(onTasks)} on tasks`}</span></div>
-        <div className="h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-white/10"><div className="h-full rounded-full bg-gradient-to-r from-brand-500 to-violet-500 transition-all" style={{ width: `${pct}%` }} /></div>
+        <div className="mb-1 flex justify-between text-xs text-slate-500 dark:text-slate-400"><span>Daily goal</span><span>{fmtDur(logged + live)} / {fmtDur(goal)}{onTasks > 0 && ` · ${fmtDur(onTasks)} on tasks`}</span></div>
+        <div className="h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-white/10"><div className="h-full rounded-full bg-brand-500 transition-all" style={{ width: `${pct}%` }} /></div>
       </div>
     </div>
   );
@@ -290,7 +280,7 @@ function QuickAdd() {
       <div className="mb-3 flex flex-wrap items-center gap-1">
         <div className="card-title !mb-0 mr-1">Quick log</div>
         {tabs.map(([k, l]) => (
-          <button key={k} onClick={() => setTab(k)} aria-pressed={tab === k} className={`cursor-pointer rounded-lg px-2.5 py-1.5 text-sm transition-colors ${tab === k ? "bg-brand-500 text-white" : "text-slate-500 hover:bg-slate-100 dark:hover:bg-white/5"}`}>{l}</button>
+          <button key={k} onClick={() => setTab(k)} aria-pressed={tab === k} className={`cursor-pointer rounded-lg px-2.5 py-1.5 text-sm transition-colors ${tab === k ? "bg-brand-600 text-white" : "text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5"}`}>{l}</button>
         ))}
       </div>
       <div className="flex flex-wrap gap-2">
@@ -308,4 +298,56 @@ function QuickAdd() {
       </div>
     </div>
   );
+}
+
+/** The one thing to do right now: the task in its slot, else the next one, with the timer one press away. */
+function NowBand() {
+  const { state } = useStore();
+  const p = usePomodoro();
+  const today = todayISO();
+  const now = useMinute();
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+  const open = tasksOn(state, today, today).filter((t) => t.status !== "done");
+  const own = (t: TodoItem) => t.planned === today && t.start && t.end;
+  const running = p.taskId ? open.find((t) => t.id === p.taskId) : undefined;
+  const live = open.find((t) => own(t) && toMin(t.start!) <= nowMin && nowMin < toMin(t.end!));
+  const next = open.filter((t) => own(t) && toMin(t.start!) > nowMin).sort((a, b) => a.start!.localeCompare(b.start!))[0];
+  const late = open.find((t) => phaseOf(t, today) === "overdue");
+  const task = running ?? live ?? late ?? next ?? open[0];
+  const label = running ? (p.running ? "Focusing on" : "Paused on") : task === live ? "Now" : task === late ? "Overdue" : "Up next";
+
+  if (!task) {
+    return (
+      <div className="card flex flex-wrap items-center justify-between gap-3">
+        <div><div className="text-base font-semibold text-slate-900 dark:text-white">{state.todos.some((t) => t.status === "done" && t.doneAt === today) ? "Everything planned is done" : "Nothing planned for today"}</div><div className="text-sm text-slate-500 dark:text-slate-400">Add a task to get going.</div></div>
+        <Link to="/schedule?new=1" className="btn"><Plus size={15} />New task</Link>
+      </div>
+    );
+  }
+  const on = p.taskId === task.id && p.started;
+  return (
+    <div className="card flex flex-wrap items-center gap-4 !border-brand-500/30 !bg-brand-50/60 dark:!bg-brand-500/10">
+      <div className="min-w-0 flex-1">
+        <div className="text-sm font-semibold text-brand-700 dark:text-brand-50">{label}{own(task) && ` · ${clock12(task.start!)} – ${clock12(task.end!)}`}</div>
+        <div className="mt-0.5 line-clamp-2 break-words text-xl font-semibold text-slate-900 dark:text-white">{task.title}</div>
+        {!!task.subjects?.length && <div className="text-sm text-slate-600 dark:text-slate-300">{task.subjects.join(", ")}</div>}
+      </div>
+      {on ? (
+        <>
+          <div className="font-mono text-2xl font-bold tabular-nums text-slate-900 dark:text-white">{formatClock(p.elapsed)}</div>
+          <TimerControls />
+        </>
+      ) : <PlayButton task={task} className="!size-11" />}
+    </div>
+  );
+}
+
+/** current time, refreshed every minute so "now" / "up next" don't go stale while the timer is idle */
+function useMinute() {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(new Date()), 60_000);
+    return () => window.clearInterval(id);
+  }, []);
+  return now;
 }

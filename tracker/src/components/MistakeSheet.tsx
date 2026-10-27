@@ -71,8 +71,8 @@ export default function MistakeSheet({ rows, defaults, showSource }: Props) {
           <tbody>
             {rows.map((m, i) => (
               <tr key={m.id} className={m.resolved ? "opacity-50" : ""}>
-                <td className="px-2 text-center text-xs text-slate-400">{i + 1}</td>
-                {showSource && <td className="truncate px-3 text-xs text-slate-500" title={sourceName(m)}>{sourceName(m)}</td>}
+                <td className="px-2 text-center text-xs text-slate-500 dark:text-slate-400">{i + 1}</td>
+                {showSource && <td className="truncate px-3 text-xs text-slate-500 dark:text-slate-400" title={sourceName(m)}>{sourceName(m)}</td>}
                 <td><input className="cell" type="number" value={m.qno ?? ""} autoFocus={m.id === focusId} onChange={(e) => patch(m.id, { qno: e.target.value ? Number(e.target.value) : undefined })} /></td>
                 <td><select className="cell" value={m.subject} onChange={(e) => patch(m.id, { subject: e.target.value })}>{catalog.subjects.map((s) => <option key={s}>{s}</option>)}</select></td>
                 <td><input className="cell" placeholder="topic" value={m.topic} onChange={(e) => patch(m.id, { topic: e.target.value })} /></td>
@@ -85,14 +85,14 @@ export default function MistakeSheet({ rows, defaults, showSource }: Props) {
                 </td>
                 <td><input className="cell" placeholder="What went wrong" value={m.question} onChange={(e) => patch(m.id, { question: e.target.value })} /></td>
                 <td><input className="cell" placeholder="Fix" value={m.fix} onChange={(e) => patch(m.id, { fix: e.target.value })} onKeyDown={(e) => e.key === "Enter" && i === rows.length - 1 && add()} /></td>
-                <td className="text-center"><input type="checkbox" className="size-4 cursor-pointer accent-indigo-600" checked={m.resolved} onChange={() => patch(m.id, { resolved: !m.resolved })} title="Revised / resolved" /></td>
+                <td className="text-center"><input type="checkbox" className="size-4 cursor-pointer accent-emerald-600" checked={m.resolved} onChange={() => patch(m.id, { resolved: !m.resolved })} title="Revised / resolved" /></td>
                 <td className="whitespace-nowrap px-1 text-center">
-                  <button className="icon-btn !size-7 hover:!text-brand-600" aria-label="Add to revision" title="Add to revision" onClick={() => toRevision(m)}><BookmarkPlus size={14} /></button>
+                  <button className="icon-btn !size-7 hover:!text-brand-600 dark:text-brand-300" aria-label="Add to revision" title="Add to revision" onClick={() => toRevision(m)}><BookmarkPlus size={14} /></button>
                   <button className="icon-btn !size-7" aria-label="Delete" onClick={() => remove("mistakes", m.id, "Row")}><Trash2 size={14} /></button>
                 </td>
               </tr>
             ))}
-            {!rows.length && <tr><td colSpan={showSource ? 12 : 11} className="py-10 text-center text-sm text-slate-400">No rows yet — add the questions you got wrong or skipped.</td></tr>}
+            {!rows.length && <tr><td colSpan={showSource ? 12 : 11} className="py-10 text-center text-sm text-slate-500 dark:text-slate-400">No rows yet — add the questions you got wrong or skipped.</td></tr>}
           </tbody>
           <tfoot>
             <tr>

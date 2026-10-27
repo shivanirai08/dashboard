@@ -32,3 +32,8 @@ export function isSameDay(iso: string, day = todayISO()): boolean {
   // full timestamps are compared by their local date
   return (iso.length > 10 ? localISO(new Date(iso)) : iso) === day;
 }
+
+/** local calendar date of a timestamp ("YYYY-MM-DD" passes through) */
+export function dayOf(iso: string): string {
+  return iso.length > 10 ? localISO(new Date(iso)) : iso;
+}

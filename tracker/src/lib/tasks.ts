@@ -1,4 +1,4 @@
-import { addDays, isSameDay, todayISO } from "./dates";
+import { addDays, dayOf, isSameDay, todayISO } from "./dates";
 import type { AppState, TodoItem } from "./types";
 
 /**
@@ -98,9 +98,33 @@ export const missedOn = (state: AppState, date: string) =>
 export const focusOn = (state: AppState, taskId: string, date: string) =>
   state.pomodoros.filter((p) => p.kind === "focus" && p.taskId === taskId && isSameDay(p.startedAt, date)).reduce((a, p) => a + p.minutes, 0);
 
-/** Day-by-day time contribution from the first day (first missed day, else its planned day) up to today / when it was done */
+/** First day the task was worked on or on the plan: earliest of its first missed day, its planned day and its first logged focus session */
+export function firstDayOf(state: AppState, t: TodoItem): string | undefined {
+  const days = [t.missed?.[0]?.date, t.planned, ...state.pomodoros.filter((p) => p.kind === "focus" && p.taskId === t.id).map((p) => dayOf(p.startedAt))].filter((d): d is string => !!d);
+  return days.sort()[0];
+}
+
+/**
+ * One-off repair: a multi-day task (has a deadline) that was pulled forward to a later day by "Move to today" gets its
+ * original start day back, found from its missed record or its earliest focus session. Idempotent.
+ */
+export function restoreMultiDayStarts(state: AppState): AppState {
+  let changed = false;
+  const todos = state.todos.map((t) => {
+    if (!t.due || !t.planned || t.revision) return t;
+    const first = firstDayOf(state, t);
+    if (!first || first >= t.planned || first > t.due) return t;
+    changed = true;
+    const slot = t.missed?.find((m) => m.date === first);
+    const { missed: _m, ...rest } = t;
+    return { ...rest, planned: first, ...(slot?.start && slot.end ? { start: slot.start, end: slot.end } : {}) };
+  });
+  return changed ? { ...state, todos } : state;
+}
+
+/** Day-by-day time contribution from the first day the task was on the plan or worked on, up to today / when it was done */
 export function dailyContribution(state: AppState, t: TodoItem, today = todayISO()) {
-  const first = t.missed?.[0]?.date ?? t.planned;
+  const first = firstDayOf(state, t);
   if (!first) return [];
   const last = t.doneAt && t.doneAt < today ? t.doneAt : today;
   const rows: { date: string; day: number; min: number }[] = [];

@@ -35,7 +35,7 @@ export default function DataPage() {
             <input type="checkbox" className="mt-1 size-4 accent-indigo-600" checked={!!state.lockPastDays} onChange={(e) => setState((s) => ({ ...s, lockPastDays: e.target.checked || undefined }))} />
             <span>
               <span className="block text-sm font-medium text-slate-900 dark:text-white">Lock past days</span>
-              <span className="block text-xs text-slate-500">No new tasks on days that are already gone. You can still edit, mark done and add notes to what’s there.</span>
+              <span className="block text-xs text-slate-500 dark:text-slate-400">No new tasks on days that are already gone. You can still edit, mark done and add notes to what’s there.</span>
             </span>
           </label>
         </div>
@@ -51,7 +51,7 @@ export default function DataPage() {
               <span className={`chip ${sync.status === "error" ? "bg-rose-100 text-rose-700" : "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300"}`}>
                 {sync.status === "saving" ? "Saving…" : sync.status === "connecting" ? "Connecting…" : sync.status === "error" ? "Sync error" : "Synced"}
               </span>
-              {sync.error && <span className="text-rose-500">{sync.error}</span>}
+              {sync.error && <span className="text-rose-600 dark:text-rose-400">{sync.error}</span>}
             </div>
           )}
         </div>
@@ -61,7 +61,7 @@ export default function DataPage() {
           <div className="flex flex-wrap gap-2">
             <button className="btn-ghost" onClick={download}><Download size={15} />Export JSON</button>
             <button className="btn-ghost" onClick={() => fileRef.current?.click()}><Upload size={15} />Import JSON</button>
-            <button className="btn-ghost !text-rose-600" onClick={() => confirm("Erase all progress?") && resetProgress()}>Reset everything</button>
+            <button className="btn-ghost !text-rose-600 dark:text-rose-400" onClick={() => confirm("Erase all progress?") && resetProgress()}>Reset everything</button>
             <input ref={fileRef} type="file" accept="application/json" hidden onChange={(e) => e.target.files?.[0] && void upload(e.target.files[0])} />
           </div>
         </div>

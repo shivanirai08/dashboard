@@ -48,18 +48,18 @@ export default function Revisions() {
           <button className="cursor-pointer text-left font-medium text-slate-900 hover:text-brand-600 dark:text-white" onClick={() => setDraft(t)}>{t.title}</button>
           <div className="mt-1 flex flex-wrap items-center gap-1.5">
             {t.subjects?.map((s) => <span key={s} className={`chip !py-0 ${subjectTone(s)}`}>{s}</span>)}
-            {t.revision?.notes && <span className="text-xs text-slate-500">{t.revision.notes}</span>}
+            {t.revision?.notes && <span className="text-xs text-slate-500 dark:text-slate-400">{t.revision.notes}</span>}
           </div>
         </div>
         <span className={`chip ${d < 0 ? "bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300" : d === 0 ? "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300" : "bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-slate-300"}`}>
           {d < 0 ? `${-d}d overdue` : d === 0 ? "due today" : formatDate(t.planned!)}
         </span>
-        <span className="text-xs text-slate-400">every {t.revision?.intervalDays}d</span>
+        <span className="text-xs text-slate-500 dark:text-slate-400">every {t.revision?.intervalDays}d</span>
         {d <= 0 && <PlayButton task={t} />}
         <button className="btn !py-1.5" onClick={() => review(t.id, true)}>Revised</button>
         <button className="btn-ghost !py-1.5" onClick={() => review(t.id, false)}>Forgot</button>
         <input type="date" aria-label={`Reschedule ${t.title}`} className="input !w-auto !px-2 !py-1 !text-xs" min={today} value={t.planned ?? ""} onChange={(e) => e.target.value && update(t.id, { planned: e.target.value }, { untimed: true })} />
-        <button className="icon-btn hover:!text-brand-600" aria-label={`Edit ${t.title}`} title="Edit" onClick={() => setDraft(t)}><Pencil size={15} /></button>
+        <button className="icon-btn hover:!text-brand-600 dark:text-brand-300" aria-label={`Edit ${t.title}`} title="Edit" onClick={() => setDraft(t)}><Pencil size={15} /></button>
         <button className="icon-btn" aria-label={`Delete ${t.title}`} onClick={del.bind(null, t)}><Trash2 size={15} /></button>
       </div>
     );
