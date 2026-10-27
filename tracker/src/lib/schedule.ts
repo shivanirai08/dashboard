@@ -1,5 +1,5 @@
 import { addDays, isSameDay, todayISO } from "./dates";
-import { plannedMin, tasksOn } from "./tasks";
+import { onPlan, plannedMin, tasksOn } from "./tasks";
 import type { AppState, TodoItem } from "./types";
 
 export const toMin = (hhmm: string) => {
@@ -55,9 +55,9 @@ export function monthDates(iso: string): string[] {
   return Array.from({ length: count }, (_, i) => addDays(start, i));
 }
 
-/** Tasks that sit on the time grid on `date`. */
-export const timedOn = (state: AppState, date: string) =>
-  state.todos.filter((t) => t.planned === date && t.start && t.end).sort((a, b) => a.start!.localeCompare(b.start!) || a.end!.localeCompare(b.end!));
+/** Tasks that sit on the time grid on `date`: on their own day, and on every later day of a multi-day task (same slot). */
+export const timedOn = (state: AppState, date: string, today = todayISO()) =>
+  state.todos.filter((t) => t.start && t.end && !!t.planned && t.planned <= date && onPlan(t, date, today)).sort((a, b) => a.start!.localeCompare(b.start!) || a.end!.localeCompare(b.end!));
 
 export type DayStats = {
   date: string;
@@ -79,7 +79,7 @@ export type DayStats = {
 
 export function dayStats(state: AppState, date: string, today = todayISO()): DayStats {
   const tasks = tasksOn(state, date, today);
-  const timed = timedOn(state, date);
+  const timed = timedOn(state, date, today);
   const done = tasks.filter((t) => t.status === "done");
   const sessions = state.pomodoros.filter((p) => p.kind === "focus" && isSameDay(p.startedAt, date));
   const taskFocusMin = sessions.filter((p) => p.taskId).reduce((a, p) => a + p.minutes, 0);

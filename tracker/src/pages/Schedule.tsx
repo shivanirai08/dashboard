@@ -319,7 +319,7 @@ function DayView({ date, today, now, stats, backlog, onEdit, onNew, onToggle }: 
                     <button className="min-w-0 flex-1 cursor-pointer text-left" onClick={(e) => { e.stopPropagation(); onEdit(t); }} aria-label={`Edit ${t.title}`}>
                       <div className={`truncate text-sm font-semibold leading-tight ${done ? "line-through opacity-70" : ""}`}>{t.revision && <Repeat size={12} className="mr-1 inline" aria-label="Revision" />}{t.title}</div>
                       {overdueDay(t, today) && <span className="mr-1 rounded bg-rose-100 px-1 text-[11px] font-semibold text-rose-700 dark:bg-rose-500/20 dark:text-rose-200">Overdue day {overdueDay(t, today)}</span>}
-                      {height >= 44 && <div className="truncate text-xs opacity-75">{clock12(t.start!)} – {clock12(t.end!)}{!!t.subjects?.length && ` · ${t.subjects.join(", ")}`}{!!t.timeMin && ` · ${fmtDur(t.timeMin)} focused`}</div>}
+                      {height >= 44 && <div className="truncate text-xs opacity-75">{clock12(t.start!)} – {clock12(t.end!)}{t.planned !== date && dayCounter(t, date) ? ` · ${dayCounter(t, date)}` : ""}{!!t.subjects?.length && ` · ${t.subjects.join(", ")}`}{!!t.timeMin && ` · ${fmtDur(t.timeMin)} focused`}</div>}
                       {noteLines > 0 && (
                         <div className="mt-0.5 space-y-0.5">
                           {t.notes!.slice(0, noteLines).map((n) => <div key={n.id} className="truncate pl-2 text-[13px] font-medium leading-[17px]" title={n.text}>{n.text}</div>)}
