@@ -302,7 +302,7 @@ function SubjectPanel({ subject, points, onFold, collapsed, fill, grip, onAdd, o
       </header>
 
       {!collapsed && <div id={panelId} className={`flex flex-col gap-2 px-3 pb-3 ${fill ? "min-h-0 flex-1" : ""}`}>
-        <textarea ref={ref} rows={1} className="input mx-1 w-[calc(100%-.5rem)] resize-none [field-sizing:content] max-h-40" placeholder={`Add to ${subject}… (Enter to add, Shift+Enter for a new line)`} aria-label={`New pointer for ${subject}`}
+        <textarea ref={ref} rows={1} className="input mx-1 w-[calc(100%-.5rem)] resize-none [field-sizing:content] max-h-40" placeholder="Add a pointer…" title="Enter to add · Shift+Enter for a new line" aria-label={`New pointer for ${subject}`}
           value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); } }} />
 
         <ul className={`space-y-0.5 overflow-y-auto ${fill ? "min-h-0 flex-1" : "max-h-96"}`}>

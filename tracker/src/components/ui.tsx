@@ -39,7 +39,7 @@ export function HoursInput({ minutes, onChange, className = "input", label }: { 
   // follow outside changes (e.g. a duration preset) without fighting what the user is typing
   if (!bad && (parsed ?? 0) !== (minutes ?? 0)) setText(minutes ? fmtHM(minutes) : "");
   return (
-    <input className={`${className} ${bad ? "!border-rose-400" : ""}`} inputMode="decimal" placeholder="e.g. 1.30" aria-label={label} aria-invalid={bad} value={text}
+    <input className={`${className} ${bad ? "!border-rose-400" : ""}`} inputMode="decimal" placeholder="1.30" aria-label={label} aria-invalid={bad} value={text}
       title="Hours.minutes — 2.45 = 2 h 45 min, 0.30 = 30 min"
       onChange={(e) => { setText(e.target.value); onChange(parseHM(e.target.value)); }} />
   );

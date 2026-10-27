@@ -73,7 +73,7 @@ export default function Revisions() {
       </PageHeader>
       <div className="card">
         <div className="grid gap-3 sm:grid-cols-7">
-          <div className="sm:col-span-3"><span className="label">Topic just studied</span><input className="input" value={topic} onChange={(e) => setTopic(e.target.value)} onKeyDown={(e) => e.key === "Enter" && add()} placeholder="e.g. Deadlock avoidance" /></div>
+          <div className="sm:col-span-3"><span className="label">Topic just studied</span><input className="input" value={topic} onChange={(e) => setTopic(e.target.value)} onKeyDown={(e) => e.key === "Enter" && add()} placeholder="Deadlock avoidance" /></div>
           <div className="sm:col-span-2"><span className="label">Subjects</span><SubjectPicker value={subjects} onChange={setSubjects} options={catalog.subjects} /></div>
           <div className="sm:col-span-1"><span className="label">Notes</span><input className="input" value={notes} onChange={(e) => setNotes(e.target.value)} onKeyDown={(e) => e.key === "Enter" && add()} /></div>
           <div className="flex items-end"><button className="btn w-full" onClick={add}>Add</button></div>

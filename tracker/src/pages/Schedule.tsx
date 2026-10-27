@@ -13,7 +13,7 @@ import TaskDialog, { type TaskDraft } from "../components/TaskDialog";
 import TaskBoard, { DRAG_TASK } from "../components/TaskBoard";
 import PlayButton from "../components/PlayButton";
 import { clock12, dayStats, fmtDur, fromMin, layoutLanes, monthDates, toMin, weekDates, weekStartOf, type DayStats } from "../lib/schedule";
-import { columnOf, dayCounter, focusOn, missedOn, overdueDay, phaseOf, plannedMin, tasksBetween } from "../lib/tasks";
+import { columnOf, dayCounter, deadlineOf, focusOn, missedOn, overdueDay, phaseOf, plannedMin, tasksBetween } from "../lib/tasks";
 import type { AppState, TodoItem } from "../lib/types";
 
 type Range = "day" | "week" | "month";
@@ -193,7 +193,8 @@ function DayView({ date, today, now, stats, backlog, onEdit, onNew, onToggle }: 
   const isToday = date === today;
   const past = date < today;
   const nowMin = now.getHours() * 60 + now.getMinutes();
-  const missed = timed.filter((t) => t.status !== "done");
+  // a multi-day task whose deadline hasn't passed is still in progress on this day, not missed
+  const missed = timed.filter((t) => t.status !== "done" && (deadlineOf(t) ?? today) < today);
 
   useEffect(() => {
     const el = scroller.current;

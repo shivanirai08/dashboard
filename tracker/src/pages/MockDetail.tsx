@@ -58,7 +58,7 @@ export default function MockDetail() {
           ))}
           <div className="text-sm text-slate-500">{(correct ?? 0) + wrong + skipped} questions · {wrong === sheetWrong ? "wrong rows match the sheet ✓" : `sheet has ${sheetWrong} wrong rows — log the rest below`}</div>
         </div>
-        <textarea className="input mt-4" rows={2} placeholder="Overall notes — time management, strategy, what to change next mock…" value={mock.notes} onChange={(e) => patch({ notes: e.target.value })} />
+        <textarea className="input mt-4" rows={2} placeholder="Overall notes…" value={mock.notes} onChange={(e) => patch({ notes: e.target.value })} />
       </div>
 
       <div>

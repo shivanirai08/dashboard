@@ -40,12 +40,16 @@ export default function TaskDialog({ draft, onClose, onDelete }: { draft: TaskDr
   const [err, setErr] = useState("");
   const titleRef = useRef<HTMLInputElement>(null);
 
+  // onClose is a new function every render and the focus timer re-renders the page each second;
+  // keep it in a ref so focus is set once and typing isn't interrupted
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
   useEffect(() => {
     titleRef.current?.focus();
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && closeRef.current();
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, []);
 
   const submit = (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -107,7 +111,7 @@ export default function TaskDialog({ draft, onClose, onDelete }: { draft: TaskDr
           </div>
 
           <div className="space-y-3">
-            <Field label={isRev ? "Topic" : "Title"}><input ref={titleRef} className="input" placeholder={isRev ? "e.g. Deadlock avoidance" : "e.g. OS – deadlocks + 10 PYQs"} value={title} onChange={(e) => { setTitle(e.target.value); setErr(""); }} /></Field>
+            <Field label={isRev ? "Topic" : "Title"}><input ref={titleRef} className="input" placeholder={isRev ? "Deadlock avoidance" : "OS – deadlocks"} value={title} onChange={(e) => { setTitle(e.target.value); setErr(""); }} /></Field>
             <div>
               <span className="label">Subjects</span>
               <SubjectPicker value={subjects} onChange={setSubjects} options={catalog.subjects} />
@@ -166,7 +170,7 @@ export default function TaskDialog({ draft, onClose, onDelete }: { draft: TaskDr
           {isRev && (
             <section className="grid grid-cols-2 gap-3 rounded-2xl border border-slate-200 p-3.5 dark:border-white/10">
               <Field label="Repeats every"><select className="input" value={interval} onChange={(e) => setInterval(Number(e.target.value))}>{[1, 3, 7, 14, 30, 60].map((d) => <option key={d} value={d}>{d} day{d > 1 ? "s" : ""}</option>)}</select></Field>
-              <Field label="Notes"><input className="input" placeholder="what to recall" value={revNotes} onChange={(e) => setRevNotes(e.target.value)} /></Field>
+              <Field label="Notes"><input className="input" placeholder="Recall hints" value={revNotes} onChange={(e) => setRevNotes(e.target.value)} /></Field>
               <p className="col-span-2 text-xs text-slate-400">Finishing it books the next review further out (1 → 3 → 7 → 14 → 30 → 60 days); “forgot” books it for tomorrow.</p>
             </section>
           )}

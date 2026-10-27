@@ -33,12 +33,15 @@ export default function TaskNotesDialog({ taskId, onClose }: { taskId: string; o
   const [editText, setEditText] = useState("");
   const ref = useRef<HTMLTextAreaElement>(null);
 
+  // onClose changes every render (the focus timer re-renders each second); a ref keeps focus from being re-grabbed
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
   useEffect(() => {
     ref.current?.focus();
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && closeRef.current();
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, []);
 
   if (!task) return null;
   const notes = task.notes ?? [];
@@ -60,7 +63,7 @@ export default function TaskNotesDialog({ taskId, onClose }: { taskId: string; o
         </div>
 
         <div>
-          <textarea ref={ref} className="input min-h-20 resize-y" placeholder="Jot something down… (Enter to add, Shift+Enter for a new line)" value={text} onChange={(e) => setText(e.target.value)} onKeyDown={onEnter(add)} aria-label="New note" />
+          <textarea ref={ref} className="input min-h-20 resize-y" placeholder="Add a note…" title="Enter to add · Shift+Enter for a new line" value={text} onChange={(e) => setText(e.target.value)} onKeyDown={onEnter(add)} aria-label="New note" />
           <div className="mt-2 flex justify-end"><button type="button" className="btn" disabled={!text.trim()} onClick={add}>Add note</button></div>
         </div>
 

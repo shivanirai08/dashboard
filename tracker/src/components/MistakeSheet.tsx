@@ -83,8 +83,8 @@ export default function MistakeSheet({ rows, defaults, showSource }: Props) {
                     {REASON_KEYS.map((k) => <option key={k} value={k}>{REASONS[k].label}</option>)}
                   </select>
                 </td>
-                <td><input className="cell" placeholder="e.g. used wrong page size" value={m.question} onChange={(e) => patch(m.id, { question: e.target.value })} /></td>
-                <td><input className="cell" placeholder="how to get it right" value={m.fix} onChange={(e) => patch(m.id, { fix: e.target.value })} onKeyDown={(e) => e.key === "Enter" && i === rows.length - 1 && add()} /></td>
+                <td><input className="cell" placeholder="What went wrong" value={m.question} onChange={(e) => patch(m.id, { question: e.target.value })} /></td>
+                <td><input className="cell" placeholder="Fix" value={m.fix} onChange={(e) => patch(m.id, { fix: e.target.value })} onKeyDown={(e) => e.key === "Enter" && i === rows.length - 1 && add()} /></td>
                 <td className="text-center"><input type="checkbox" className="size-4 cursor-pointer accent-indigo-600" checked={m.resolved} onChange={() => patch(m.id, { resolved: !m.resolved })} title="Revised / resolved" /></td>
                 <td className="whitespace-nowrap px-1 text-center">
                   <button className="icon-btn !size-7 hover:!text-brand-600" aria-label="Add to revision" title="Add to revision" onClick={() => toRevision(m)}><BookmarkPlus size={14} /></button>

@@ -47,7 +47,7 @@ function TopicInput({ topics, onChange, suggestions, disabled }: { topics: strin
   return (
     <div className={disabled ? "opacity-50" : ""}>
       <div className="flex gap-2">
-        <input className="input" list="topic-suggestions" disabled={disabled} placeholder="Type a topic, press Enter" aria-label="Add a topic" value={text}
+        <input className="input" list="topic-suggestions" disabled={disabled} placeholder="Add a topic…" aria-label="Add a topic" value={text}
           onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === ",") { e.preventDefault(); add(); } }} onBlur={add} />
         <button type="button" className="btn-ghost" disabled={disabled || !text.trim()} onClick={add} aria-label="Add topic"><Plus size={15} /></button>
       </div>
@@ -78,7 +78,7 @@ export function AttemptForm({ kind, f, setF, editing, err, subjects, topicSugges
     <form className={`card h-fit xl:sticky xl:top-4 ${editing ? "ring-2 ring-brand-500" : ""}`} onSubmit={(e) => { e.preventDefault(); onSave(); }}>
       <div className="card-title flex items-center gap-2"><span className="size-2.5 rounded-full" style={{ background: meta.color }} aria-hidden />{editing ? `Edit ${meta.noun}` : `Log a ${meta.noun}`}</div>
       <div className="grid grid-cols-6 gap-3">
-        <Field label="Name" className="col-span-6"><input className="input" placeholder={kind === "test" ? "e.g. OS – Deadlocks test" : kind === "custom" ? "e.g. Algo + TOC mix 2" : "e.g. GateQA Full Mock 4"} value={f.name} onChange={(e) => set("name", e.target.value)} /></Field>
+        <Field label="Name" className="col-span-6"><input className="input" placeholder={kind === "test" ? "OS – Deadlocks" : kind === "custom" ? "Algo + TOC mix" : "Full Mock 4"} value={f.name} onChange={(e) => set("name", e.target.value)} /></Field>
 
         {kind === "custom" && (
           <div className="col-span-6">
@@ -109,7 +109,7 @@ export function AttemptForm({ kind, f, setF, editing, err, subjects, topicSugges
           </>
         )}
 
-        <Field label={kind === "test" ? "Source (optional)" : "Source"} className="col-span-3"><input className="input" placeholder={kind === "test" ? "book / platform" : ""} value={f.source} onChange={(e) => set("source", e.target.value)} /></Field>
+        <Field label={kind === "test" ? "Source (optional)" : "Source"} className="col-span-3"><input className="input" placeholder={kind === "test" ? "Book / site" : ""} value={f.source} onChange={(e) => set("source", e.target.value)} /></Field>
         <Field label="Date" className="col-span-3"><input className="input" type="date" value={f.date} onChange={(e) => set("date", e.target.value)} /></Field>
         <Field label="Marks" className="col-span-2"><input className="input" type="number" step="any" value={f.score} onChange={(e) => set("score", e.target.value)} /></Field>
         <Field label="Out of" className="col-span-2"><input className="input" type="number" value={f.maxScore} onChange={(e) => set("maxScore", e.target.value)} /></Field>

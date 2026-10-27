@@ -242,7 +242,7 @@ function FocusNow() {
       </label>
       {!p.taskId && (
         <div className="mt-2 flex gap-2">
-          <input aria-label="What are you studying" className="input min-w-0 flex-1" placeholder="What are you studying? (optional)" value={p.label} onChange={(e) => p.setLabel(e.target.value)} />
+          <input aria-label="What are you studying" className="input min-w-0 flex-1" placeholder="Studying what?" value={p.label} onChange={(e) => p.setLabel(e.target.value)} />
           <select aria-label="Subject" className="input !w-36" value={p.subject} onChange={(e) => p.setSubject(e.target.value)}>
             <option value="">Subject</option>{catalog.subjects.map((x) => <option key={x}>{x}</option>)}
           </select>
@@ -283,7 +283,7 @@ function QuickAdd() {
   };
 
   const tabs: [Tab, string][] = [["mistake", "Mistake"], ["revision", "Revision"], ["mock", "Mock"]];
-  const ph = { mistake: "What did you get wrong?", revision: "Topic you just studied…", mock: "Mock name…" }[tab];
+  const ph = { mistake: "What went wrong?", revision: "Topic studied…", mock: "Mock name…" }[tab];
 
   return (
     <div className="card">
