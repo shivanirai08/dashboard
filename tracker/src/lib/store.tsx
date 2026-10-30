@@ -100,6 +100,26 @@ const localTs = () => {
   }
 };
 
+/**
+ * Combine this device's state with the cloud copy. Whole-state "newest wins" used to throw away
+ * whatever the other side had logged, so devices drifted apart. Focus sessions are append-only,
+ * so they are unioned by id (totals and streaks then agree everywhere); everything else follows
+ * the newer side, keeping the larger per-task time so a merged task never loses logged minutes.
+ */
+function mergeStates(local: AppState, remote: AppState, remoteNewer: boolean): AppState {
+  const [base, other] = remoteNewer ? [remote, local] : [local, remote];
+  const seen = new Set<string>();
+  const pomodoros = [...local.pomodoros, ...remote.pomodoros]
+    .filter((p) => (seen.has(p.id) ? false : (seen.add(p.id), true)))
+    .sort((a, b) => b.startedAt.localeCompare(a.startedAt));
+  const otherTime = new Map(other.todos.map((t) => [t.id, t.timeMin ?? 0]));
+  const todos = base.todos.map((t) => {
+    const theirs = otherTime.get(t.id) ?? 0;
+    return theirs > (t.timeMin ?? 0) ? { ...t, timeMin: theirs } : t;
+  });
+  return { ...base, pomodoros, todos };
+}
+
 export type SyncStatus = "off" | "connecting" | "synced" | "saving" | "error";
 
 type Store = {
@@ -119,46 +139,72 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [sync, setSync] = useState<Store["sync"]>({ status: supabase ? "connecting" : "off" });
   const ready = useRef(false); // never push before the first pull finished
 
-  // pull once on load: newest side wins
+  const stateRef = useRef(state);
   useEffect(() => {
-    if (!supabase) return;
-    void supabase
-      .from("tracker_state")
-      .select("data, updated_at")
-      .eq("id", ROW)
-      .maybeSingle()
-      .then(({ data, error }) => {
-        if (error) {
-          setSync({ status: "error", error: error.message });
-          return;
-        }
-        if (data && data.updated_at > localTs()) {
-          const next = normalize(data.data as AppState);
-          persist(next, data.updated_at);
-          setStateRaw(next);
-        }
-        ready.current = true;
-        setSync({ status: "synced" });
-        setStateRaw((s) => ({ ...s })); // first push when local was newer / remote empty
-      });
+    stateRef.current = state;
+  }, [state]);
+
+  // pull the cloud copy and merge it in; resolves to the merged state (null if the pull failed)
+  const pullMerge = useCallback(async (): Promise<AppState | null> => {
+    if (!supabase) return null;
+    const { data, error } = await supabase.from("tracker_state").select("data, updated_at").eq("id", ROW).maybeSingle();
+    if (error) {
+      setSync({ status: "error", error: error.message });
+      return null;
+    }
+    if (!data) return stateRef.current;
+    const remote = normalize(data.data as AppState);
+    const remoteNewer = data.updated_at > localTs();
+    const merged = mergeStates(stateRef.current, remote, remoteNewer);
+    if (JSON.stringify(merged) !== JSON.stringify(stateRef.current)) {
+      persist(merged, remoteNewer ? data.updated_at : undefined);
+      stateRef.current = merged;
+      setStateRaw((prev) => mergeStates(prev, remote, remoteNewer));
+    }
+    return merged;
   }, []);
 
-  // debounced push
+  // pull on load, then again whenever the app comes back to the foreground or the network returns,
+  // so a device that sat open (or offline) for days catches up
+  useEffect(() => {
+    if (!supabase) return;
+    void pullMerge().then((merged) => {
+      if (!merged) return;
+      ready.current = true;
+      setSync({ status: "synced" });
+      setStateRaw((s) => ({ ...s })); // first push when local was newer / remote empty
+    });
+    const refresh = () => {
+      if (ready.current && document.visibilityState === "visible") void pullMerge();
+    };
+    document.addEventListener("visibilitychange", refresh);
+    window.addEventListener("focus", refresh);
+    window.addEventListener("online", refresh);
+    return () => {
+      document.removeEventListener("visibilitychange", refresh);
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener("online", refresh);
+    };
+  }, [pullMerge]);
+
+  // debounced push: merge the latest cloud copy first so another device's changes are never overwritten
   useEffect(() => {
     if (!supabase || !ready.current) return;
     const sb = supabase;
     setSync((s) => (s.status === "error" ? s : { status: "saving" }));
     const t = window.setTimeout(async () => {
+      const merged = await pullMerge();
+      if (!merged) return;
       const ts = new Date().toISOString();
-      const { error } = await sb.from("tracker_state").upsert({ id: ROW, data: state, updated_at: ts });
+      const { error } = await sb.from("tracker_state").upsert({ id: ROW, data: merged, updated_at: ts });
       if (error) setSync({ status: "error", error: error.message });
       else {
-        persist(state, ts);
+        persist(merged, ts);
         setSync({ status: "synced" });
       }
     }, 800);
     return () => window.clearTimeout(t);
-  }, [state]);
+  }, [state, pullMerge]);
 
   const setState = useCallback((updater: (prev: AppState) => AppState) => {
     setStateRaw((prev) => {
