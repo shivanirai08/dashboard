@@ -125,7 +125,7 @@ export default function Dashboard() {
 /** Today's tasks, in time order — the same tasks as the Schedule page. */
 function TodayPlan() {
   const { state } = useStore();
-  const { toggleDone } = useTasks();
+  const { toggleDone, reschedule, drop } = useTasks();
   const today = todayISO();
   const now = useMinute();
   const nowMin = now.getHours() * 60 + now.getMinutes();
@@ -135,6 +135,7 @@ function TodayPlan() {
   const tasks = [...plan].sort((a, b) => rank(a) - rank(b) || (a.planned === today ? a.start ?? "99" : "00").localeCompare(b.planned === today ? b.start ?? "99" : "00"));
   const backlog = state.todos.filter((t) => columnOf(t, today) === "backlog");
   const comingUp = state.todos.filter((t) => phaseOf(t, today) === "upcoming" && (startOf(t) ?? "") <= addDays(today, 7)).sort((a, b) => (startOf(a) ?? "").localeCompare(startOf(b) ?? "")).slice(0, 3);
+  const missed = state.todos.filter((t) => phaseOf(t, today) === "overdue");
   const done = tasks.filter((t) => t.status === "done").length;
   const pct = tasks.length ? Math.round((done / tasks.length) * 100) : 0;
 
@@ -153,6 +154,15 @@ function TodayPlan() {
           <Link to="/schedule?new=1" className="btn !px-2.5 !py-1 !text-xs"><Plus size={13} />New task</Link>
         </div>
       </div>
+
+      {missed.length > 0 && (
+        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
+          {missed.length} unfinished task{missed.length > 1 ? "s" : ""} from earlier days
+          <button className="ml-auto cursor-pointer font-semibold underline-offset-2 hover:underline" onClick={() => missed.forEach((t) => reschedule(t.id, today))}>Move to today</button>
+          <button className="cursor-pointer font-semibold underline-offset-2 hover:underline" title="Leave them on their days, marked dropped" onClick={() => missed.forEach((t) => drop(t.id))}>Drop</button>
+          <Link to="/schedule" className="font-semibold underline-offset-2 hover:underline">Review</Link>
+        </div>
+      )}
 
       {tasks.length ? tasks.slice(0, 8).map((t) => {
         const isDone = t.status === "done";

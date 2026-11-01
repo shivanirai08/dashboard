@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { AlertCircle, CalendarDays, Check, ChevronLeft, ChevronRight, Clock, Inbox, KanbanSquare, NotebookPen, Plus, Repeat, Target, Trophy, Undo2 } from "lucide-react";
+import { AlertCircle, CalendarDays, Check, ChevronLeft, ChevronRight, Clock, Inbox, KanbanSquare, NotebookPen, Plus, Repeat, Target, Trophy, Undo2, Ban } from "lucide-react";
 import { useStore } from "../lib/store";
 import { useToast } from "../components/Toast";
 import { useRemove } from "../lib/undo";
@@ -50,6 +50,7 @@ function ghostLabel(state: AppState, id: string, date: string, day: number) {
 
 /** emerald = done, amber = date passed & unfinished, indigo = still to come */
 function tone(t: TodoItem, today: string) {
+  if (t.dropped && t.status !== "done") return { box: "border-slate-300 bg-slate-100 text-slate-600 dark:border-white/15 dark:bg-white/5 dark:text-slate-400", bar: "bg-slate-400" };
   if (t.status === "done") return { box: "border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-500/40 dark:bg-emerald-500/15 dark:text-emerald-100", bar: "bg-emerald-500" };
   if ((t.planned ?? t.due ?? today) < today) return { box: "border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/15 dark:text-amber-100", bar: "bg-amber-500" };
   // in progress (its day has started) is stronger than upcoming, which stays an outline
@@ -178,7 +179,7 @@ type DayProps = {
 
 function DayView({ date, today, now, stats, backlog, onEdit, onNew, onToggle }: DayProps) {
   const { state } = useStore();
-  const { reschedule, putBack, create } = useTasks();
+  const { reschedule, putBack, create, drop, undrop } = useTasks();
   const [quick, setQuick] = useState("");
   const addQuick = () => { if (!quick.trim() || (!!state.lockPastDays && date < today)) return; create({ title: quick.trim(), planned: date }); setQuick(""); toast(`Added “${quick.trim()}” — ${date === today ? "today" : shortDay(date)}`); };
   const toast = useToast();
@@ -198,7 +199,7 @@ function DayView({ date, today, now, stats, backlog, onEdit, onNew, onToggle }: 
   const past = date < today;
   const nowMin = now.getHours() * 60 + now.getMinutes();
   // a multi-day task whose deadline hasn't passed is still in progress on this day, not missed
-  const missed = timed.filter((t) => t.status !== "done" && (deadlineOf(t) ?? today) < today);
+  const missed = timed.filter((t) => t.status !== "done" && !t.dropped && (deadlineOf(t) ?? today) < today);
 
   useEffect(() => {
     const el = scroller.current;
@@ -222,6 +223,7 @@ function DayView({ date, today, now, stats, backlog, onEdit, onNew, onToggle }: 
   };
 
   const carryOver = () => missed.forEach((t) => reschedule(t.id, today));
+  const dropAll = () => { missed.forEach((t) => drop(t.id)); toast(`Dropped ${missed.length} task${missed.length > 1 ? "s" : ""}`); };
   const sessions = state.pomodoros.filter((p) => p.kind === "focus" && isSameDay(p.startedAt, date));
   const mocks = state.mocks.filter((m) => m.date === date);
   const taskName = (id?: string) => (id ? state.todos.find((t) => t.id === id)?.title : undefined);
@@ -233,6 +235,7 @@ function DayView({ date, today, now, stats, backlog, onEdit, onNew, onToggle }: 
           <div className="flex flex-wrap items-center gap-2 border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
             <AlertCircle size={15} />{missed.length} task{missed.length > 1 ? "s" : ""} weren’t finished.
             <button className="ml-auto cursor-pointer font-semibold underline-offset-2 hover:underline" onClick={carryOver}>Move to today</button>
+            <button className="cursor-pointer font-semibold underline-offset-2 hover:underline" title="Keep on this day, marked dropped" onClick={dropAll}>Drop</button>
           </div>
         )}
         {(strip.length > 0 || ghostStrip.length > 0) && (
@@ -247,15 +250,19 @@ function DayView({ date, today, now, stats, backlog, onEdit, onNew, onToggle }: 
               ))}
               {strip.map((t) => {
                 const late = phaseOf(t, today) === "overdue";
+                const dropped = !!t.dropped && t.status !== "done";
                 const counter = dayCounter(t, date);
                 return (
-                  <div key={t.id} {...dragProps(t.id)} className={`flex max-w-full items-center gap-2 rounded-lg border px-2 py-1 text-sm ${late ? "border-rose-300 bg-rose-50 text-rose-900 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-100" : tone(t, today).box}`}>
+                  <div key={t.id} {...dragProps(t.id)} className={`flex max-w-full items-center gap-2 rounded-lg border px-2 py-1 text-sm ${late && !t.dropped ? "border-rose-300 bg-rose-50 text-rose-900 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-100" : tone(t, today).box}`}>
                     <input type="checkbox" className="size-4 shrink-0 cursor-pointer accent-emerald-600" checked={t.status === "done"} onChange={() => onToggle(t)} aria-label={`Mark “${t.title}” ${t.status === "done" ? "not done" : "done"}`} />
-                    <button className={`min-w-0 cursor-pointer truncate text-left font-medium ${t.status === "done" ? "line-through opacity-70" : ""}`} onClick={() => onEdit(t)}>{(t.revision || t.series) && <Repeat size={12} className="mr-1 inline" aria-label={t.series ? `Repeat ${t.series.n} of ${t.series.of}` : "Revision"} />}{t.title}</button>
+                    <button className={`min-w-0 cursor-pointer truncate text-left font-medium ${t.status === "done" || dropped ? "line-through opacity-70" : ""}`} onClick={() => onEdit(t)}>{(t.revision || t.series) && <Repeat size={12} className="mr-1 inline" aria-label={t.series ? `Repeat ${t.series.n} of ${t.series.of}` : "Revision"} />}{t.title}</button>
                     {late && !overdueDay(t, today) && <span className="shrink-0 text-xs font-semibold">{-daysUntil(t.due ?? t.planned ?? today)}d overdue</span>}
                     {counter && <span className="shrink-0 text-xs opacity-70">{counter}</span>}
                     {overdueDay(t, today) && <span className="shrink-0 rounded bg-rose-100 px-1 text-xs font-semibold text-rose-700 dark:bg-rose-500/20 dark:text-rose-200">Overdue day {overdueDay(t, today)}</span>}
-                    {late && isToday && <button className="shrink-0 cursor-pointer text-xs font-semibold underline-offset-2 hover:underline" onClick={() => reschedule(t.id, today)}>Move to today</button>}
+                    {dropped && <span className="shrink-0 rounded bg-slate-200 px-1 text-xs font-semibold text-slate-600 dark:bg-white/10 dark:text-slate-300">Dropped</span>}
+                    {late && <button className="shrink-0 cursor-pointer text-xs font-semibold underline-offset-2 hover:underline" onClick={() => reschedule(t.id, today)}>Move to today</button>}
+                    {late && <button className="shrink-0 cursor-pointer text-xs font-semibold underline-offset-2 hover:underline" title="Keep on its day, marked dropped" onClick={() => drop(t.id)}>Drop</button>}
+                    {dropped && <button className="shrink-0 cursor-pointer text-xs font-semibold underline-offset-2 hover:underline" onClick={() => undrop(t.id)}>Restore</button>}
                     <NotesButton task={t} className="!size-6" />
                     <PlayButton task={t} className="!size-6" />
                   </div>
@@ -308,6 +315,8 @@ function DayView({ date, today, now, stats, backlog, onEdit, onNew, onToggle }: 
               const height = Math.max(24, (plannedMin(t) / 60) * HOUR_PX - 2);
               const c = tone(t, today);
               const done = t.status === "done";
+              const dropped = !!t.dropped && !done;
+              const late = !done && !dropped && phaseOf(t, today) === "overdue";
               // as many notes (max 2) as fit under the title and time line
               const noteLines = Math.max(0, Math.min(2, t.notes?.length ?? 0, Math.floor((height - 8 - 20 - (height >= 44 ? 16 : 0)) / 18)));
               return (
@@ -317,7 +326,7 @@ function DayView({ date, today, now, stats, backlog, onEdit, onNew, onToggle }: 
                   <div className="flex h-full items-start gap-2 py-1 pl-3 pr-2">
                     <input type="checkbox" className="mt-0.5 size-4 shrink-0 cursor-pointer accent-emerald-600" checked={done} onClick={(e) => e.stopPropagation()} onChange={() => onToggle(t)} aria-label={`Mark “${t.title}” ${done ? "not done" : "done"}`} />
                     <button className="min-w-0 flex-1 cursor-pointer text-left" onClick={(e) => { e.stopPropagation(); onEdit(t); }} aria-label={`Edit ${t.title}`}>
-                      <div className={`truncate text-sm font-semibold leading-tight ${done ? "line-through opacity-70" : ""}`}>{(t.revision || t.series) && <Repeat size={12} className="mr-1 inline" aria-label={t.series ? `Repeat ${t.series.n} of ${t.series.of}` : "Revision"} />}{t.title}</div>
+                      <div className={`truncate text-sm font-semibold leading-tight ${done || dropped ? "line-through opacity-70" : ""}`}>{dropped && <span className="mr-1 rounded bg-slate-200 px-1 text-[11px] font-semibold no-underline text-slate-600 dark:bg-white/10 dark:text-slate-300">Dropped</span>}{(t.revision || t.series) && <Repeat size={12} className="mr-1 inline" aria-label={t.series ? `Repeat ${t.series.n} of ${t.series.of}` : "Revision"} />}{t.title}</div>
                       {overdueDay(t, today) && <span className="mr-1 rounded bg-rose-100 px-1 text-[11px] font-semibold text-rose-700 dark:bg-rose-500/20 dark:text-rose-200">Overdue day {overdueDay(t, today)}</span>}
                       {height >= 44 && <div className="truncate text-xs opacity-75">{clock12(t.start!)} – {clock12(t.end!)}{t.planned !== date && dayCounter(t, date) ? ` · ${dayCounter(t, date)}` : ""}{!!t.subjects?.length && ` · ${t.subjects.join(", ")}`}{!!t.timeMin && ` · ${fmtDur(t.timeMin)} focused`}</div>}
                       {noteLines > 0 && (
@@ -329,6 +338,9 @@ function DayView({ date, today, now, stats, backlog, onEdit, onNew, onToggle }: 
                     </button>
                     {!done && !!t.missed?.length && <button type="button" className="icon-btn !size-6 shrink-0 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100" title="Remove from today — put it back on the day it was missed" aria-label={`Remove “${t.title}” from today`}
                       onClick={(e) => { e.stopPropagation(); const d = putBack(t.id); if (d) toast(`Put back on ${shortDay(d)}`); }}><Undo2 size={13} /></button>}
+                    {late && <button type="button" className="icon-btn !size-6 shrink-0 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100" title="Drop — don't carry it forward" aria-label={`Drop “${t.title}”`}
+                      onClick={(e) => { e.stopPropagation(); drop(t.id); toast(`“${t.title}” dropped`); }}><Ban size={13} /></button>}
+                    {dropped && <button type="button" className="icon-btn !size-6 shrink-0" title="Restore" aria-label={`Restore “${t.title}”`} onClick={(e) => { e.stopPropagation(); undrop(t.id); }}><Undo2 size={13} /></button>}
                     <NotesButton task={t} className="!size-6" />
                     <PlayButton task={t} className="!size-6" />
                   </div>

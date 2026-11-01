@@ -89,6 +89,7 @@ export function useTasks() {
           // starting a task puts it on today
           if (status === "doing" && (!t.planned || t.planned > today)) return withTime(t, { status, planned: today, start: undefined, end: undefined, doneAt: undefined }, !!t.revision);
           const next = { ...t, status };
+          delete next.dropped;
           if (status === "done") next.doneAt = today;
           else delete next.doneAt;
           return next;
@@ -104,6 +105,8 @@ export function useTasks() {
       ...s,
       todos: s.todos.map((t) => {
         if (t.id !== id || t.status === "done") return t; // finished tasks stay where they were done
+        t = { ...t };
+        delete t.dropped;
         const miss = missPatch(t, date) ?? {};
         if (t.revision && !t.start && !start) return withTime(t, { ...miss, planned: date }, true);
         const len = t.start && t.end ? toMin(t.end) - toMin(t.start) : DEFAULT_LEN;
@@ -153,6 +156,15 @@ export function useTasks() {
     return last.date;
   }, [setState]);
 
+  /** Give up on an overdue task: it stays on its own days, marked dropped, and never moves forward. */
+  const drop = useCallback((id: string) => {
+    setState((s) => ({ ...s, todos: s.todos.map((t) => (t.id === id && t.status !== "done" ? { ...t, dropped: todayISO() } : t)) }));
+  }, [setState]);
+  /** Take a dropped task back: it becomes an ordinary overdue task again. */
+  const undrop = useCallback((id: string) => {
+    setState((s) => ({ ...s, todos: s.todos.map((t) => { if (t.id !== id) return t; const { dropped: _d, ...rest } = t; return rest; }) }));
+  }, [setState]);
+
   const patchNotes = useCallback((id: string, fn: (notes: TaskNote[]) => TaskNote[]) => {
     setState((s) => ({ ...s, todos: s.todos.map((t) => {
       if (t.id !== id) return t;
@@ -171,5 +183,5 @@ export function useTasks() {
   }, [patchNotes]);
   const deleteNote = useCallback((id: string, noteId: string) => patchNotes(id, (n) => n.filter((x) => x.id !== noteId)), [patchNotes]);
 
-  return { create, update, setStatus, toggleDone, reschedule, moveTo, review, putBack, addNote, editNote, deleteNote };
+  return { create, update, setStatus, toggleDone, reschedule, moveTo, review, putBack, drop, undrop, addNote, editNote, deleteNote };
 }

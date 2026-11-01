@@ -6,9 +6,9 @@ import type { AppState, TodoItem } from "./types";
  *   no date            → "keep in todo" (backlog)
  *   planned (+ time)   → on the calendar that day, and in progress from then until it is done
  *   due (optional)     → later deadline for tasks that span several days
- * Unfinished past its last day → overdue; it keeps showing on today until done.
+ * Unfinished past its last day → overdue; it stays on its own days until the user moves it to today.
  */
-export type TaskPhase = "done" | "overdue" | "active" | "upcoming" | "backlog";
+export type TaskPhase = "done" | "dropped" | "overdue" | "active" | "upcoming" | "backlog";
 export type Column = "backlog" | "todo" | "doing" | "done";
 
 export const startOf = (t: TodoItem) => t.planned ?? t.due;
@@ -22,17 +22,18 @@ const toMin = (hhmm: string) => {
 /** planned length in minutes (0 when untimed) */
 export const plannedMin = (t: TodoItem) => (t.start && t.end ? Math.max(0, toMin(t.end) - toMin(t.start)) : 0);
 
-/** last day the task is on the plan (unfinished tasks carry over to today) */
-function endOf(t: TodoItem, today: string): string | undefined {
+/** last day the task is on the plan (unfinished tasks stay on their own days until the user moves them) */
+function endOf(t: TodoItem, _today: string): string | undefined {
   const start = startOf(t);
   const end = deadlineOf(t);
   if (!start || !end) return undefined;
   if (t.status === "done") return t.doneAt ? (t.doneAt < end ? t.doneAt : end) : end;
-  return start <= today && end < today ? today : end;
+  return end;
 }
 
 export function phaseOf(t: TodoItem, today = todayISO()): TaskPhase {
   if (t.status === "done") return "done";
+  if (t.dropped) return "dropped";
   const start = startOf(t);
   const end = deadlineOf(t);
   if (!start || !end) return "backlog";
@@ -65,7 +66,7 @@ export function tasksBetween(state: AppState, from: string, to: string, today = 
 
 /** Board column. A scheduled task is "in progress" from its day on — no dragging needed. */
 export function columnOf(t: TodoItem, today = todayISO()): Column {
-  if (t.status === "done") return "done";
+  if (t.status === "done" || t.dropped) return "done";
   if (t.status === "doing") return "doing";
   if (!t.planned && !t.due) return "backlog";
   const start = startOf(t)!;

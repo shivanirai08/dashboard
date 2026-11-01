@@ -98,6 +98,8 @@ export type TodoItem = {
   /** deadline pushed back this many times */
   extensions?: number;
   originalDue?: string;
+  /** date the user gave up on this task instead of moving it forward; it stays on its own days, marked dropped */
+  dropped?: string;
   /** days this task was left unfinished and then moved on; each stays on its original day as a faded copy */
   missed?: { date: string; start?: string; end?: string; due?: string }[];
   /** free-form notes the user jots down against this task (separate from the edit dialog) */

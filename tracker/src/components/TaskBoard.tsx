@@ -35,7 +35,7 @@ type Props = { tasks: TodoItem[]; onEdit: (t: TodoItem) => void; onDelete: (t: T
 export default function TaskBoard({ tasks, onEdit, onDelete }: Props) {
   const { state } = useStore();
   const toast = useToast();
-  const { moveTo, toggleDone, reschedule, review, putBack } = useTasks();
+  const { moveTo, toggleDone, reschedule, review, putBack, drop, undrop } = useTasks();
   const today = todayISO();
   const [over, setOver] = useState<Column | null>(null);
 
@@ -87,6 +87,7 @@ export default function TaskBoard({ tasks, onEdit, onDelete }: Props) {
                       {t.revision && <span className="chip bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300"><Repeat size={11} className="mr-1" />every {t.revision.intervalDays}d</span>}
                       {t.series && <span className="chip bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300"><Repeat size={11} className="mr-1" />{t.series.n}/{t.series.of}</span>}
                       {phase === "overdue" && !overdueDay(t, today) && <span className="chip bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300">{-daysUntil(t.due ?? t.planned ?? today)}d overdue</span>}
+                      {phase === "dropped" && <span className="chip bg-slate-200 text-slate-600 dark:bg-white/10 dark:text-slate-300">Dropped</span>}
                       {overdueDay(t, today) && <span className="chip bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300">Overdue day {overdueDay(t, today)}</span>}
                       {counter && <span className="chip bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300">{counter}</span>}
                     </div>
@@ -116,6 +117,8 @@ export default function TaskBoard({ tasks, onEdit, onDelete }: Props) {
                       )}
                       {!done && !!t.missed?.length && <button className="chip cursor-pointer border border-rose-200 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:border-rose-500/30 dark:hover:bg-rose-500/10" title="Put it back on the day it was missed" onClick={() => { const d = putBack(t.id); if (d) toast(`“${t.title}” put back on ${formatDate(d)}`); }}>Remove from today</button>}
                       {phase === "overdue" && <button className="chip cursor-pointer border border-rose-200 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:border-rose-500/30 dark:hover:bg-rose-500/10" onClick={() => reschedule(t.id, today)}>Move to today</button>}
+                      {phase === "overdue" && <button className="chip cursor-pointer border border-slate-200 text-slate-600 hover:bg-slate-100 dark:border-white/10 dark:text-slate-300 dark:hover:bg-white/10" title="Don't carry it forward; it stays on its day marked as dropped" onClick={() => { drop(t.id); toast(`“${t.title}” dropped`); }}>Drop</button>}
+                      {phase === "dropped" && <button className="chip cursor-pointer border border-slate-200 text-slate-600 hover:bg-slate-100 dark:border-white/10 dark:text-slate-300 dark:hover:bg-white/10" onClick={() => undrop(t.id)}>Restore</button>}
                       <span className="ml-auto flex items-center gap-1">
                         <NotesButton task={t} className="!size-6" />
                         <PlayButton task={t} className="!size-6" />
