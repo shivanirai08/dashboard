@@ -251,7 +251,7 @@ function DayView({ date, today, now, stats, backlog, onEdit, onNew, onToggle }: 
                 return (
                   <div key={t.id} {...dragProps(t.id)} className={`flex max-w-full items-center gap-2 rounded-lg border px-2 py-1 text-sm ${late ? "border-rose-300 bg-rose-50 text-rose-900 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-100" : tone(t, today).box}`}>
                     <input type="checkbox" className="size-4 shrink-0 cursor-pointer accent-emerald-600" checked={t.status === "done"} onChange={() => onToggle(t)} aria-label={`Mark “${t.title}” ${t.status === "done" ? "not done" : "done"}`} />
-                    <button className={`min-w-0 cursor-pointer truncate text-left font-medium ${t.status === "done" ? "line-through opacity-70" : ""}`} onClick={() => onEdit(t)}>{t.revision && <Repeat size={12} className="mr-1 inline" aria-label="Revision" />}{t.title}</button>
+                    <button className={`min-w-0 cursor-pointer truncate text-left font-medium ${t.status === "done" ? "line-through opacity-70" : ""}`} onClick={() => onEdit(t)}>{(t.revision || t.series) && <Repeat size={12} className="mr-1 inline" aria-label={t.series ? `Repeat ${t.series.n} of ${t.series.of}` : "Revision"} />}{t.title}</button>
                     {late && !overdueDay(t, today) && <span className="shrink-0 text-xs font-semibold">{-daysUntil(t.due ?? t.planned ?? today)}d overdue</span>}
                     {counter && <span className="shrink-0 text-xs opacity-70">{counter}</span>}
                     {overdueDay(t, today) && <span className="shrink-0 rounded bg-rose-100 px-1 text-xs font-semibold text-rose-700 dark:bg-rose-500/20 dark:text-rose-200">Overdue day {overdueDay(t, today)}</span>}
@@ -317,7 +317,7 @@ function DayView({ date, today, now, stats, backlog, onEdit, onNew, onToggle }: 
                   <div className="flex h-full items-start gap-2 py-1 pl-3 pr-2">
                     <input type="checkbox" className="mt-0.5 size-4 shrink-0 cursor-pointer accent-emerald-600" checked={done} onClick={(e) => e.stopPropagation()} onChange={() => onToggle(t)} aria-label={`Mark “${t.title}” ${done ? "not done" : "done"}`} />
                     <button className="min-w-0 flex-1 cursor-pointer text-left" onClick={(e) => { e.stopPropagation(); onEdit(t); }} aria-label={`Edit ${t.title}`}>
-                      <div className={`truncate text-sm font-semibold leading-tight ${done ? "line-through opacity-70" : ""}`}>{t.revision && <Repeat size={12} className="mr-1 inline" aria-label="Revision" />}{t.title}</div>
+                      <div className={`truncate text-sm font-semibold leading-tight ${done ? "line-through opacity-70" : ""}`}>{(t.revision || t.series) && <Repeat size={12} className="mr-1 inline" aria-label={t.series ? `Repeat ${t.series.n} of ${t.series.of}` : "Revision"} />}{t.title}</div>
                       {overdueDay(t, today) && <span className="mr-1 rounded bg-rose-100 px-1 text-[11px] font-semibold text-rose-700 dark:bg-rose-500/20 dark:text-rose-200">Overdue day {overdueDay(t, today)}</span>}
                       {height >= 44 && <div className="truncate text-xs opacity-75">{clock12(t.start!)} – {clock12(t.end!)}{t.planned !== date && dayCounter(t, date) ? ` · ${dayCounter(t, date)}` : ""}{!!t.subjects?.length && ` · ${t.subjects.join(", ")}`}{!!t.timeMin && ` · ${fmtDur(t.timeMin)} focused`}</div>}
                       {noteLines > 0 && (

@@ -13,6 +13,7 @@ export default function SubjectPicker({ value, onChange, options }: { value: str
   const input = useRef<HTMLInputElement>(null);
   const listId = useId();
   const rest = options.filter((o) => !value.includes(o) && o.toLowerCase().includes(q.trim().toLowerCase()));
+  const all = options.length > 0 && options.every((o) => value.includes(o));
   const pick = (o: string) => {
     onChange([...value, o]);
     setQ("");
@@ -31,6 +32,11 @@ export default function SubjectPicker({ value, onChange, options }: { value: str
   return (
     <div className="relative">
       <div className="input flex min-h-[2.5rem] cursor-text flex-wrap items-center gap-1.5 !py-1.5" onClick={() => input.current?.focus()}>
+        {options.length > 1 && (
+          <button type="button" aria-pressed={all} title={all ? "Clear all subjects" : "Add every subject"}
+            className={`chip cursor-pointer border transition ${all ? "border-brand-600 bg-brand-600 text-white" : "border-slate-300 text-slate-600 hover:bg-slate-100 dark:border-white/20 dark:text-slate-300 dark:hover:bg-white/10"}`}
+            onClick={(e) => { e.stopPropagation(); onChange(all ? [] : [...options]); }}>All</button>
+        )}
         {value.map((s) => (
           <span key={s} className={`chip gap-1 !pr-1 ${subjectTone(s)}`}>
             {s}

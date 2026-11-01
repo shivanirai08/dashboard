@@ -85,6 +85,7 @@ export default function TaskBoard({ tasks, onEdit, onDelete }: Props) {
                       {t.subjects?.slice(0, 2).map((x) => <span key={x} className={`chip ${subjectTone(x)}`}>{x}</span>)}
                       {(t.subjects?.length ?? 0) > 2 && <span className="chip bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-slate-300">+{t.subjects!.length - 2}</span>}
                       {t.revision && <span className="chip bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300"><Repeat size={11} className="mr-1" />every {t.revision.intervalDays}d</span>}
+                      {t.series && <span className="chip bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300"><Repeat size={11} className="mr-1" />{t.series.n}/{t.series.of}</span>}
                       {phase === "overdue" && !overdueDay(t, today) && <span className="chip bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300">{-daysUntil(t.due ?? t.planned ?? today)}d overdue</span>}
                       {overdueDay(t, today) && <span className="chip bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300">Overdue day {overdueDay(t, today)}</span>}
                       {counter && <span className="chip bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300">{counter}</span>}

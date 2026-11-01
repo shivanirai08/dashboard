@@ -28,6 +28,9 @@ export default function TaskDialog({ draft, onClose, onDelete }: { draft: TaskDr
   const [isRev, setIsRev] = useState(!!draft.revision);
   const [interval, setInterval] = useState(draft.revision?.intervalDays ?? 1);
   const [revNotes, setRevNotes] = useState(draft.revision?.notes ?? "");
+  const [repeatOn, setRepeatOn] = useState(false);
+  const [repeatEvery, setRepeatEvery] = useState(1);
+  const [repeatTimes, setRepeatTimes] = useState(5);
   const [priority, setPriority] = useState<Priority>(draft.priority ?? "med");
   const [scheduled, setScheduled] = useState(isNew ? draft.planned !== undefined || !("planned" in draft) : !!draft.planned);
   const [date, setDate] = useState(draft.planned ?? (isNew && !("planned" in draft) ? todayISO() : ""));
@@ -74,7 +77,14 @@ export default function TaskDialog({ draft, onClose, onDelete }: { draft: TaskDr
     fields.revision = isRev ? { key: draft.revision?.key || uid(), intervalDays: interval, lastReviewed: draft.revision?.lastReviewed ?? todayISO(), notes: revNotes.trim() || undefined } : undefined;
     if (isRev) fields.due = undefined;
     const untimed = isRev && !start;
-    if (isNew) create({ title: fields.title!, ...fields, status }, { untimed });
+    const times = isNew && !isRev && scheduled && repeatOn ? Math.min(60, Math.max(2, Math.floor(repeatTimes) || 2)) : 1;
+    if (times > 1) {
+      // a fixed run: one ordinary task per occurrence, the first keeps the chosen status
+      const id = uid();
+      for (let i = times - 1; i >= 0; i--) {
+        create({ title: fields.title!, ...fields, planned: addDays(date, i * repeatEvery), status: i === 0 ? status : "todo", series: { id, n: i + 1, of: times, everyDays: repeatEvery } }, { untimed });
+      }
+    } else if (isNew) create({ title: fields.title!, ...fields, status }, { untimed });
     else {
       // finishing a revision goes through the spaced-repetition path so the next one gets scheduled
       const finishing = !!draft.revision && isRev && status === "done" && draft.status !== "done";
@@ -155,6 +165,21 @@ export default function TaskDialog({ draft, onClose, onDelete }: { draft: TaskDr
                   ))}
                 </div>
                 {!start && <p className="text-xs text-slate-500 dark:text-slate-400">{isRev ? "All-day revision — add a start time to put it on the time grid." : `No start time? It’s placed at the current time (${nowHM()}) for an hour.`}</p>}
+                {isNew && !isRev && (
+                  <div className="space-y-2">
+                    <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+                      <input type="checkbox" className="size-4 accent-brand-600" checked={repeatOn} onChange={(e) => setRepeatOn(e.target.checked)} />
+                      <Repeat size={13} />Repeat for a set number of days
+                    </label>
+                    {repeatOn && (
+                      <div className="grid grid-cols-2 gap-3">
+                        <Field label="Every"><select className="input" value={repeatEvery} onChange={(e) => setRepeatEvery(Number(e.target.value))}>{[1, 2, 3, 7].map((d) => <option key={d} value={d}>{d} day{d > 1 ? "s" : ""}</option>)}</select></Field>
+                        <Field label="Times"><input type="number" className="input" min={2} max={60} value={repeatTimes} onChange={(e) => setRepeatTimes(Number(e.target.value))} /></Field>
+                        <p className="col-span-2 text-xs text-slate-500 dark:text-slate-400">Creates {Math.min(60, Math.max(2, Math.floor(repeatTimes) || 2))} separate tasks, {repeatEvery === 1 ? "one each day" : `every ${repeatEvery} days`} from the date above. Unlike a revision, the gap never grows.</p>
+                      </div>
+                    )}
+                  </div>
+                )}
                 {isRev ? null : showDue ? (
                   <Field label="Deadline (for tasks that take several days)">
                     <div className="flex gap-2">

@@ -86,6 +86,8 @@ export type TodoItem = {
     lastReviewed: string;
     notes?: string;
   };
+  /** one of a fixed run of copies (e.g. daily for 5 days); each copy is an ordinary task */
+  series?: { id: string; n: number; of: number; everyDays: number };
   /** the day it is scheduled on; no date = "keep in todo". In progress from this day until it is done */
   planned?: string;
   /** time of day on `planned`, "HH:MM" 24h; end is start + duration */
