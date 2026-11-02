@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Navigate, NavLink, Route, Routes, useLocation, useNavigate } from "react-router-dom";
-import { CalendarDays, Ellipsis, LayoutDashboard, LineChart, ListChecks, Moon, RotateCcw, Settings, Sun, TriangleAlert } from "lucide-react";
+import { CalendarDays, Ellipsis, MoonStar, LayoutDashboard, LineChart, ListChecks, Moon, RotateCcw, Settings, Sun, TriangleAlert } from "lucide-react";
 import Dashboard from "./pages/Dashboard";
 import Mocks from "./pages/Mocks";
 import MockDetail from "./pages/MockDetail";
@@ -12,7 +12,8 @@ import DataPage from "./pages/DataPage";
 import { useStore } from "./lib/store";
 import { formatClock, usePomodoro } from "./lib/pomodoro";
 import { useTheme } from "./lib/theme";
-import { todayISO } from "./lib/dates";
+import { addDays, dayStillOpen, todayISO } from "./lib/dates";
+import { useToast } from "./components/Toast";
 
 const links = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -25,11 +26,33 @@ const links = [
 ];
 
 export default function App() {
-  const { catalog, sync, state } = useStore();
+  const { catalog, sync, state, setState } = useStore();
+  const toast = useToast();
   const { theme, toggle } = useTheme();
   const pomo = usePomodoro();
   const nav = useNavigate();
   const today = todayISO();
+  const canEnd = dayStillOpen();
+  const setEnd = (day: string, at: string | null) =>
+    setState((s) => {
+      const dayEnds = { ...s.dayEnds };
+      if (at) dayEnds[day] = at;
+      else delete dayEnds[day];
+      return { ...s, dayEnds };
+    });
+  const shortDate = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" });
+  const endDay = () => {
+    const day = todayISO();
+    setEnd(day, new Date().toISOString());
+    toast(`Day ended — you're on ${shortDate(addDays(day, 1))} now`, () => setEnd(day, null), "Reopen");
+  };
+  const endBtn = (cls: string) => (
+    <button type="button" disabled={!canEnd} title={canEnd ? undefined : "Available from 12 am to 4 am, while the day is still open"}
+      onClick={() => { endDay(); setMore(false); }}
+      className={`flex items-center gap-2 font-medium text-slate-700 enabled:cursor-pointer enabled:hover:bg-slate-100 disabled:opacity-40 dark:text-slate-200 dark:enabled:hover:bg-white/5 ${cls}`}>
+      <MoonStar size={16} />End day
+    </button>
+  );
   const [more, setMore] = useState(false);
   const loc = useLocation();
   useEffect(() => setMore(false), [loc.pathname]);
@@ -87,6 +110,7 @@ export default function App() {
             <kbd className="rounded border border-slate-300 px-1 dark:border-white/20">N</kbd> new task ·{" "}
             <kbd className="rounded border border-slate-300 px-1 dark:border-white/20">Space</kbd> start/pause
           </div>
+          {endBtn("w-full justify-center rounded-xl border border-slate-200 px-3 py-2.5 text-sm dark:border-white/10")}
           {pomo.started && (
             <NavLink to="/" className="block rounded-xl bg-brand-50 px-3 py-2 text-center dark:bg-brand-500/15">
               <div className="text-[11px] uppercase text-brand-600 dark:text-brand-300">{pomo.running ? "focus running" : "focus paused"}</div>
@@ -132,6 +156,7 @@ export default function App() {
               <Icon size={18} />{label}{!!badge[to] && <span className="ml-auto rounded-full bg-slate-200 px-1.5 text-xs font-semibold tabular-nums text-slate-600 dark:bg-white/10 dark:text-slate-300">{badge[to]}</span>}
             </NavLink>
           ))}
+          {endBtn("w-full rounded-xl px-3 py-3 text-sm")}
           <button type="button" onClick={toggle} className="flex w-full cursor-pointer items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium text-slate-700 dark:text-slate-200">{theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}{theme === "dark" ? "Light" : "Dark"} theme</button>
         </div>
       )}

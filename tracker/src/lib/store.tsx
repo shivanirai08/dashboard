@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import { bundledCatalog } from "./catalog";
+import { setDayEnds } from "./dates";
 import { supabase } from "./supabase";
 import { restoreMultiDayStarts } from "./tasks";
 import type { AppState, Catalog } from "./types";
@@ -138,6 +139,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [state, setStateRaw] = useState<AppState>(() => load());
   const [sync, setSync] = useState<Store["sync"]>({ status: supabase ? "connecting" : "off" });
   const ready = useRef(false); // never push before the first pull finished
+
+  setDayEnds(state.dayEnds); // "today" is derived from this, so it must be set before children render
 
   const stateRef = useRef(state);
   useEffect(() => {

@@ -167,4 +167,6 @@ export type AppState = {
   subjectPoints?: SubjectPoint[];
   /** daily focus goal in minutes */
   dailyGoalMin?: number;
+  /** "End day" presses: day (YYYY-MM-DD) -> when it was ended. Anything after that moment belongs to the next day. */
+  dayEnds?: Record<string, string>;
 };

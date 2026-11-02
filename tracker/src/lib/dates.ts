@@ -3,8 +3,36 @@ function localISO(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+/**
+ * "End day" presses, date -> when. The day is over when the user says so, not at midnight:
+ * until the previous day is ended, the small hours (before GRACE_HOUR) still belong to it.
+ */
+let dayEnds: Record<string, string> = {};
+const GRACE_HOUR = 4;
+
+export function setDayEnds(e: Record<string, string> | undefined) {
+  dayEnds = e ?? {};
+}
+
+/** the day a moment belongs to, honouring "End day" and the late-night grace window */
+export function logicalDay(at: Date): string {
+  let day = localISO(at);
+  if (at.getHours() < GRACE_HOUR) {
+    const prev = addDays(day, -1);
+    const ended = dayEnds[prev];
+    if (!ended || new Date(ended) > at) day = prev;
+  }
+  const ended = dayEnds[day];
+  return ended && new Date(ended) <= at ? addDays(day, 1) : day;
+}
+
 export function todayISO(): string {
-  return localISO(new Date());
+  return logicalDay(new Date());
+}
+
+/** true in the small hours while the previous day is still open (so "End day" is available) */
+export function dayStillOpen(): boolean {
+  return todayISO() < localISO(new Date());
 }
 
 export function addDays(isoDate: string, days: number): string {
@@ -29,11 +57,11 @@ export function daysUntil(iso: string): number {
 }
 
 export function isSameDay(iso: string, day = todayISO()): boolean {
-  // full timestamps are compared by their local date
-  return (iso.length > 10 ? localISO(new Date(iso)) : iso) === day;
+  // full timestamps are compared by the day they belong to
+  return dayOf(iso) === day;
 }
 
 /** local calendar date of a timestamp ("YYYY-MM-DD" passes through) */
 export function dayOf(iso: string): string {
-  return iso.length > 10 ? localISO(new Date(iso)) : iso;
+  return iso.length > 10 ? logicalDay(new Date(iso)) : iso;
 }
