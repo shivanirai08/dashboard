@@ -91,13 +91,36 @@ export function useTasks() {
           const next = { ...t, status };
           delete next.dropped;
           if (status === "done") next.doneAt = today;
-          else delete next.doneAt;
+          else { delete next.doneAt; delete next.completion; }
           return next;
         }),
     }));
   }, [setState, review]);
 
   const toggleDone = useCallback((t: TodoItem) => setStatus(t.id, t.status === "done" ? "todo" : "done"), [setStatus]);
+
+  /** Mark a task done at `pct`% (100 = fully). Below 100 it can leave the rest as a new task for tomorrow. */
+  const finish = useCallback((t: TodoItem, pct: number, carryRest = false) => {
+    const p = Math.max(1, Math.min(100, Math.round(pct)));
+    if (t.status !== "done") setStatus(t.id, "done");
+    const today = todayISO();
+    setState((s) => {
+      const todos = s.todos.map((x) => {
+        if (x.id !== t.id) return x;
+        const next = { ...x };
+        if (p === 100) delete next.completion;
+        else next.completion = p;
+        return next;
+      });
+      if (!carryRest || p === 100) return { ...s, todos };
+      const rest: TodoItem = {
+        id: uid(), title: `${t.title} (rest)`, subjects: t.subjects, priority: t.priority, status: "todo", createdAt: today,
+        planned: addDays(today, 1), start: t.start, end: t.end,
+      };
+      return { ...s, todos: [rest, ...todos] };
+    });
+    toast(p === 100 ? "Marked done" : `Marked ${p}% done${carryRest ? " · rest moved to tomorrow" : ""}`);
+  }, [setState, setStatus, toast]);
 
   /** Put a task on `date` (keeps its length; picks the current time if it had none; all-day revisions stay all-day). */
   const reschedule = useCallback((id: string, date: string, start?: string) => {
@@ -183,5 +206,5 @@ export function useTasks() {
   }, [patchNotes]);
   const deleteNote = useCallback((id: string, noteId: string) => patchNotes(id, (n) => n.filter((x) => x.id !== noteId)), [patchNotes]);
 
-  return { create, update, setStatus, toggleDone, reschedule, moveTo, review, putBack, drop, undrop, addNote, editNote, deleteNote };
+  return { create, update, setStatus, toggleDone, finish, reschedule, moveTo, review, putBack, drop, undrop, addNote, editNote, deleteNote };
 }

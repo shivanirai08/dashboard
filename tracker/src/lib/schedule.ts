@@ -1,5 +1,5 @@
 import { addDays, isSameDay, todayISO } from "./dates";
-import { onPlan, plannedMin, tasksOn } from "./tasks";
+import { doneFraction, onPlan, plannedMin, tasksOn } from "./tasks";
 import type { AppState, TodoItem } from "./types";
 
 export const toMin = (hhmm: string) => {
@@ -68,6 +68,8 @@ export type DayStats = {
   plannedMin: number;
   doneMin: number;
   done: number;
+  /** weighted count: a half-finished task counts 0.5 */
+  score: number;
   /** 0–1, or null when nothing was planned */
   completion: number | null;
   focusMin: number;
@@ -89,9 +91,10 @@ export function dayStats(state: AppState, date: string, today = todayISO()): Day
     tasks,
     timed,
     plannedMin: timed.reduce((a, t) => a + plannedMin(t), 0),
-    doneMin: timed.filter((t) => t.status === "done").reduce((a, t) => a + plannedMin(t), 0),
+    doneMin: timed.reduce((a, t) => a + plannedMin(t) * doneFraction(t), 0),
     done: done.length,
-    completion: tasks.length ? done.length / tasks.length : null,
+    score: tasks.reduce((a, t) => a + doneFraction(t), 0),
+    completion: tasks.length ? tasks.reduce((a, t) => a + doneFraction(t), 0) / tasks.length : null,
     focusMin,
     taskFocusMin,
     extraFocusMin: focusMin - taskFocusMin,

@@ -12,8 +12,9 @@ import { NotesButton } from "../components/TaskNotes";
 import TaskDialog, { type TaskDraft } from "../components/TaskDialog";
 import TaskBoard, { DRAG_TASK } from "../components/TaskBoard";
 import PlayButton from "../components/PlayButton";
+import CompletionDialog from "../components/CompletionDialog";
 import { clock12, dayStats, fmtDur, fromMin, layoutLanes, monthDates, toMin, weekDates, weekStartOf, type DayStats } from "../lib/schedule";
-import { columnOf, dayCounter, deadlineOf, focusOn, missedOn, overdueDay, phaseOf, plannedMin, tasksBetween } from "../lib/tasks";
+import { columnOf, dayCounter, deadlineOf, doneFraction, focusOn, missedOn, overdueDay, phaseOf, plannedMin, tasksBetween } from "../lib/tasks";
 import type { AppState, TodoItem } from "../lib/types";
 
 type Range = "day" | "week" | "month";
@@ -51,6 +52,7 @@ function ghostLabel(state: AppState, id: string, date: string, day: number) {
 /** emerald = done, amber = date passed & unfinished, indigo = still to come */
 function tone(t: TodoItem, today: string) {
   if (t.dropped && t.status !== "done") return { box: "border-slate-300 bg-slate-100 text-slate-600 dark:border-white/15 dark:bg-white/5 dark:text-slate-400", bar: "bg-slate-400" };
+  if (t.status === "done" && t.completion) return { box: "border-lime-300 bg-lime-50 text-lime-900 dark:border-lime-500/40 dark:bg-lime-500/15 dark:text-lime-100", bar: "bg-lime-500" };
   if (t.status === "done") return { box: "border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-500/40 dark:bg-emerald-500/15 dark:text-emerald-100", bar: "bg-emerald-500" };
   if ((t.planned ?? t.due ?? today) < today) return { box: "border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/15 dark:text-amber-100", bar: "bg-amber-500" };
   // in progress (its day has started) is stronger than upcoming, which stays an outline
@@ -71,7 +73,10 @@ export default function Schedule() {
   const { state } = useStore();
   const toast = useToast();
   const remove = useRemove();
-  const { toggleDone, reschedule } = useTasks();
+  const { toggleDone, finish, reschedule } = useTasks();
+  const [rating, setRating] = useState<{ task: TodoItem; anchor: HTMLElement } | null>(null);
+  /** ticking opens the "how much?" dialog; unticking a finished task reopens it straight away */
+  const onToggle = (t: TodoItem, anchor: HTMLElement) => (t.status === "done" ? toggleDone(t) : setRating({ task: t, anchor }));
   const today = todayISO();
   const [params, setParams] = useSearchParams();
   const [range, setRangeRaw] = useState<Range>(() => pref("sched-range", ["day", "week", "month"] as const, "day"));
@@ -141,14 +146,16 @@ export default function Schedule() {
         </div>
       </div>
 
-      {view === "calendar" && range === "day" && <DayView date={date} today={today} now={now} stats={stats[0]} backlog={backlog} onEdit={setDraft} onNew={openNew} onToggle={toggleDone} />}
-      {view === "calendar" && range === "week" && <WeekView stats={stats} today={today} onOpen={(d) => { setDate(d); setRange("day"); }} onEdit={setDraft} onNew={(d) => setDraft({ planned: d })} onToggle={toggleDone} onMove={moveToDay} />}
+      {view === "calendar" && range === "day" && <DayView date={date} today={today} now={now} stats={stats[0]} backlog={backlog} onEdit={setDraft} onNew={openNew} onToggle={onToggle} />}
+      {view === "calendar" && range === "week" && <WeekView stats={stats} today={today} onOpen={(d) => { setDate(d); setRange("day"); }} onEdit={setDraft} onNew={(d) => setDraft({ planned: d })} onToggle={onToggle} onMove={moveToDay} />}
       {view === "calendar" && range === "month" && <MonthView stats={stats} month={date.slice(0, 7)} today={today} onOpen={(d) => { setDate(d); setRange("day"); }} onEdit={setDraft} onMove={moveToDay} />}
       {view === "calendar" && range !== "day" && <BacklogTray tasks={backlog} onEdit={setDraft} />}
 
       {view === "board" && <TaskBoard tasks={[...inRange, ...backlog]} onEdit={setDraft} onDelete={del} />}
 
       {(view === "board" || range !== "day") && <RangeSummary stats={stats} tasks={inRange} today={today} range={range} chart={range !== "day"} />}
+
+      {rating && <CompletionDialog key={rating.task.id} task={rating.task} anchor={rating.anchor} onClose={() => setRating(null)} onSave={(pct, carry) => { finish(rating.task, pct, carry); setRating(null); }} />}
 
       {draft && <TaskDialog key={draft.id ?? "new"} draft={draft} onClose={() => setDraft(null)} onDelete={del} />}
     </>
@@ -174,7 +181,7 @@ type DayProps = {
   date: string; today: string; now: Date; stats: DayStats; backlog: TodoItem[];
   onEdit: (t: TodoItem) => void;
   onNew: (extra?: TaskDraft) => void;
-  onToggle: (t: TodoItem) => void;
+  onToggle: (t: TodoItem, anchor: HTMLElement) => void;
 };
 
 function DayView({ date, today, now, stats, backlog, onEdit, onNew, onToggle }: DayProps) {
@@ -254,8 +261,8 @@ function DayView({ date, today, now, stats, backlog, onEdit, onNew, onToggle }: 
                 const counter = dayCounter(t, date);
                 return (
                   <div key={t.id} {...dragProps(t.id)} className={`flex max-w-full items-center gap-2 rounded-lg border px-2 py-1 text-sm ${late && !t.dropped ? "border-rose-300 bg-rose-50 text-rose-900 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-100" : tone(t, today).box}`}>
-                    <input type="checkbox" className="size-4 shrink-0 cursor-pointer accent-emerald-600" checked={t.status === "done"} onChange={() => onToggle(t)} aria-label={`Mark “${t.title}” ${t.status === "done" ? "not done" : "done"}`} />
-                    <button className={`min-w-0 cursor-pointer truncate text-left font-medium ${t.status === "done" || dropped ? "line-through opacity-70" : ""}`} onClick={() => onEdit(t)}>{(t.revision || t.series) && <Repeat size={12} className="mr-1 inline" aria-label={t.series ? `Repeat ${t.series.n} of ${t.series.of}` : "Revision"} />}{t.title}</button>
+                    <input type="checkbox" className="size-4 shrink-0 cursor-pointer accent-emerald-600" checked={t.status === "done"} onChange={(e) => onToggle(t, e.currentTarget)} aria-label={`Mark “${t.title}” ${t.status === "done" ? "not done" : "done"}`} />
+                    <button className={`min-w-0 cursor-pointer truncate text-left font-medium ${t.status === "done" || dropped ? "line-through opacity-70" : ""}`} onClick={() => onEdit(t)}>{(t.revision || t.series) && <Repeat size={12} className="mr-1 inline" aria-label={t.series ? `Repeat ${t.series.n} of ${t.series.of}` : "Revision"} />}{t.title}{t.status === "done" && !!t.completion && <span className="ml-1.5 text-xs font-semibold no-underline">{t.completion}%</span>}</button>
                     {late && !overdueDay(t, today) && <span className="shrink-0 text-xs font-semibold">{-daysUntil(t.due ?? t.planned ?? today)}d overdue</span>}
                     {counter && <span className="shrink-0 text-xs opacity-70">{counter}</span>}
                     {overdueDay(t, today) && <span className="shrink-0 rounded bg-rose-100 px-1 text-xs font-semibold text-rose-700 dark:bg-rose-500/20 dark:text-rose-200">Overdue day {overdueDay(t, today)}</span>}
@@ -324,9 +331,9 @@ function DayView({ date, today, now, stats, backlog, onEdit, onNew, onToggle }: 
                   style={{ top, height, left: `calc(${(lane / n) * 100}% + 2px)`, width: `calc(${100 / n}% - 4px)` }} onClick={() => onEdit(t)}>
                   <span className={`absolute inset-y-0 left-0 w-1 ${c.bar}`} />
                   <div className="flex h-full items-start gap-2 py-1 pl-3 pr-2">
-                    <input type="checkbox" className="mt-0.5 size-4 shrink-0 cursor-pointer accent-emerald-600" checked={done} onClick={(e) => e.stopPropagation()} onChange={() => onToggle(t)} aria-label={`Mark “${t.title}” ${done ? "not done" : "done"}`} />
+                    <input type="checkbox" className="mt-0.5 size-4 shrink-0 cursor-pointer accent-emerald-600" checked={done} onClick={(e) => e.stopPropagation()} onChange={(e) => onToggle(t, e.currentTarget)} aria-label={`Mark “${t.title}” ${done ? "not done" : "done"}`} />
                     <button className="min-w-0 flex-1 cursor-pointer text-left" onClick={(e) => { e.stopPropagation(); onEdit(t); }} aria-label={`Edit ${t.title}`}>
-                      <div className={`truncate text-sm font-semibold leading-tight ${done || dropped ? "line-through opacity-70" : ""}`}>{dropped && <span className="mr-1 rounded bg-slate-200 px-1 text-[11px] font-semibold no-underline text-slate-600 dark:bg-white/10 dark:text-slate-300">Dropped</span>}{(t.revision || t.series) && <Repeat size={12} className="mr-1 inline" aria-label={t.series ? `Repeat ${t.series.n} of ${t.series.of}` : "Revision"} />}{t.title}</div>
+                      <div className={`truncate text-sm font-semibold leading-tight ${done || dropped ? "line-through opacity-70" : ""}`}>{dropped && <span className="mr-1 rounded bg-slate-200 px-1 text-[11px] font-semibold no-underline text-slate-600 dark:bg-white/10 dark:text-slate-300">Dropped</span>}{(t.revision || t.series) && <Repeat size={12} className="mr-1 inline" aria-label={t.series ? `Repeat ${t.series.n} of ${t.series.of}` : "Revision"} />}{t.title}{done && !!t.completion && <span className="ml-1.5 rounded bg-lime-200 px-1 text-[11px] font-semibold text-lime-900 no-underline dark:bg-lime-500/25 dark:text-lime-100">{t.completion}%</span>}</div>
                       {overdueDay(t, today) && <span className="mr-1 rounded bg-rose-100 px-1 text-[11px] font-semibold text-rose-700 dark:bg-rose-500/20 dark:text-rose-200">Overdue day {overdueDay(t, today)}</span>}
                       {height >= 44 && <div className="truncate text-xs opacity-75">{clock12(t.start!)} – {clock12(t.end!)}{t.planned !== date && dayCounter(t, date) ? ` · ${dayCounter(t, date)}` : ""}{!!t.subjects?.length && ` · ${t.subjects.join(", ")}`}{!!t.timeMin && ` · ${fmtDur(t.timeMin)} focused`}</div>}
                       {noteLines > 0 && (
@@ -368,7 +375,7 @@ function DayView({ date, today, now, stats, backlog, onEdit, onNew, onToggle }: 
           </div>
           <dl className="mt-4 divide-y divide-slate-100 text-sm dark:divide-white/[.06]">
             {[
-              ["Tasks done", `${stats.done}/${stats.tasks.length}`],
+              ["Tasks done", `${+stats.score.toFixed(1)}/${stats.tasks.length}`],
               ["Time planned", `${fmtDur(stats.doneMin)} / ${fmtDur(stats.plannedMin)}`],
               ["Focused", fmtDur(stats.focusMin)],
               ["On tasks · extra", `${fmtDur(stats.taskFocusMin)} · ${fmtDur(stats.extraFocusMin)}`],
@@ -418,7 +425,7 @@ function DayView({ date, today, now, stats, backlog, onEdit, onNew, onToggle }: 
 /* Week                                                                */
 /* ------------------------------------------------------------------ */
 
-type WeekProps = { stats: DayStats[]; today: string; onOpen: (d: string) => void; onToggle: (t: TodoItem) => void; onEdit: (t: TodoItem) => void; onNew: (d: string) => void; onMove: (id: string, d: string) => void };
+type WeekProps = { stats: DayStats[]; today: string; onOpen: (d: string) => void; onToggle: (t: TodoItem, anchor: HTMLElement) => void; onEdit: (t: TodoItem) => void; onNew: (d: string) => void; onMove: (id: string, d: string) => void };
 
 function WeekView({ stats, today, onOpen, onToggle, onEdit, onNew, onMove }: WeekProps) {
   const { state } = useStore();
@@ -440,17 +447,17 @@ function WeekView({ stats, today, onOpen, onToggle, onEdit, onNew, onMove }: Wee
             <div className="mb-2 h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-white/10" aria-hidden>
               <div className={`h-full rounded-full ${s.date < today && (s.completion ?? 1) < 1 ? "bg-amber-500" : "bg-emerald-500"}`} style={{ width: `${(s.completion ?? 0) * 100}%` }} />
             </div>
-            <div className="mb-2 text-xs tabular-nums text-slate-500 dark:text-slate-400">{s.tasks.length ? `${s.done}/${s.tasks.length} done${s.plannedMin ? ` · ${fmtDur(s.plannedMin)}` : ""}` : "Free day"}</div>
+            <div className="mb-2 text-xs tabular-nums text-slate-500 dark:text-slate-400">{s.tasks.length ? `${+s.score.toFixed(1)}/${s.tasks.length} done${s.plannedMin ? ` · ${fmtDur(s.plannedMin)}` : ""}` : "Free day"}</div>
             <div className="flex-1 space-y-1.5">
               {items.map((t) => {
                 const c = tone(t, today);
                 const own = t.planned === s.date;
                 return (
                   <div key={t.id} {...dragProps(t.id)} className={`flex cursor-grab items-start gap-1.5 rounded-lg border px-1.5 py-1 text-xs ${c.box} ${own ? "" : "border-dashed"}`}>
-                    <input type="checkbox" className="mt-0.5 size-3.5 shrink-0 cursor-pointer accent-emerald-600" checked={t.status === "done"} onChange={() => onToggle(t)} aria-label={`Mark “${t.title}” ${t.status === "done" ? "not done" : "done"}`} />
+                    <input type="checkbox" className="mt-0.5 size-3.5 shrink-0 cursor-pointer accent-emerald-600" checked={t.status === "done"} onChange={(e) => onToggle(t, e.currentTarget)} aria-label={`Mark “${t.title}” ${t.status === "done" ? "not done" : "done"}`} />
                     <div className="min-w-0 flex-1">
                       <button className="block w-full cursor-pointer text-left" onClick={() => onEdit(t)}>
-                        <div className={`line-clamp-2 break-words font-medium ${t.status === "done" ? "line-through opacity-70" : ""}`}>{t.revision && <Repeat size={10} className="mr-1 inline" aria-label="Revision" />}{t.title}</div>
+                        <div className={`line-clamp-2 break-words font-medium ${t.status === "done" ? "line-through opacity-70" : ""}`}>{t.revision && <Repeat size={10} className="mr-1 inline" aria-label="Revision" />}{t.title}{t.status === "done" && !!t.completion && <span className="ml-1 text-[11px] font-semibold">{t.completion}%</span>}</div>
                       </button>
                       <div className="mt-0.5 flex items-center gap-1">
                         <span className="min-w-0 flex-1 truncate text-[11px] opacity-70">{own && t.start ? clock12(t.start) : own ? "all day" : dayCounter(t, s.date) ?? "carried over"}</span>
@@ -500,7 +507,7 @@ function MonthView({ stats, month, today, onOpen, onEdit, onMove }: { stats: Day
             <div key={d} onClick={() => onOpen(d)} {...dropProps((id) => onMove(id, d))}
               className={`flex min-h-[72px] cursor-pointer flex-col gap-1 bg-white p-1.5 text-left transition hover:bg-brand-50 sm:min-h-28 dark:bg-panel dark:hover:bg-white/[.04] ${inMonth ? "" : "opacity-40"}`}>
               <div className="flex items-center justify-between">
-                <button type="button" onClick={(e) => { e.stopPropagation(); onOpen(d); }} aria-label={`${longDay(d)}: ${s.tasks.length ? `${s.done} of ${s.tasks.length} tasks done` : "no tasks"}`} className={`grid size-6 cursor-pointer place-items-center rounded-full text-xs font-semibold ${isToday ? "bg-brand-600 text-white" : "text-slate-700 dark:text-slate-300"}`}>{Number(d.slice(8))}</button>
+                <button type="button" onClick={(e) => { e.stopPropagation(); onOpen(d); }} aria-label={`${longDay(d)}: ${s.tasks.length ? `${+s.score.toFixed(1)} of ${s.tasks.length} tasks done` : "no tasks"}`} className={`grid size-6 cursor-pointer place-items-center rounded-full text-xs font-semibold ${isToday ? "bg-brand-600 text-white" : "text-slate-700 dark:text-slate-300"}`}>{Number(d.slice(8))}</button>
                 {full ? <Check size={14} className="text-emerald-500" aria-hidden /> : missed ? <span className="size-2 rounded-full bg-amber-500" aria-hidden /> : null}
               </div>
               <div className="hidden min-w-0 flex-1 space-y-0.5 sm:block">
@@ -552,7 +559,7 @@ function BacklogTray({ tasks, onEdit }: { tasks: TodoItem[]; onEdit: (t: TodoIte
 
 function RangeSummary({ stats, tasks, today, range, chart }: { stats: DayStats[]; tasks: TodoItem[]; today: string; range: Range; chart: boolean }) {
   const sum = (f: (s: DayStats) => number) => stats.reduce((a, s) => a + f(s), 0);
-  const done = tasks.filter((t) => t.status === "done").length;
+  const done = +tasks.reduce((a, t) => a + doneFraction(t), 0).toFixed(1);
   const overdue = tasks.filter((t) => phaseOf(t, today) === "overdue").length;
   const planned = sum((s) => s.plannedMin);
   const focus = sum((s) => s.focusMin);

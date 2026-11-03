@@ -22,6 +22,9 @@ const toMin = (hhmm: string) => {
 /** planned length in minutes (0 when untimed) */
 export const plannedMin = (t: TodoItem) => (t.start && t.end ? Math.max(0, toMin(t.end) - toMin(t.start)) : 0);
 
+/** 0–1: how much of a task counts as finished (done = `completion`% or all of it; unfinished = 0) */
+export const doneFraction = (t: TodoItem) => (t.status === "done" ? (t.completion ?? 100) / 100 : 0);
+
 /** last day the task is on the plan (unfinished tasks stay on their own days until the user moves them) */
 function endOf(t: TodoItem, _today: string): string | undefined {
   const start = startOf(t);

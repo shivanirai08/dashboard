@@ -108,6 +108,8 @@ export type TodoItem = {
   timeMin?: number;
   createdAt: string;
   doneAt?: string;
+  /** how much of the task was actually finished, 1–99. Only set on done tasks; missing = fully done (100) */
+  completion?: number;
 };
 
 export type PomodoroSession = {
