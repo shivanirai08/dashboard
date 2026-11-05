@@ -3,6 +3,8 @@ import { Cloud, Download, Upload } from "lucide-react";
 import { useStore } from "../lib/store";
 import { supabaseConfigured } from "../lib/supabase";
 import { HoursInput, PageHeader } from "../components/ui";
+import { defaultGoalOn } from "../lib/goals";
+import { todayISO } from "../lib/dates";
 
 export default function DataPage() {
   const { state, setState, exportJson, importJson, resetProgress, sync } = useStore();
@@ -25,7 +27,7 @@ export default function DataPage() {
           <div className="card-title">Goals</div>
           <div className="flex flex-wrap gap-4">
             <label><span className="label">Exam date</span><input className="input !w-48" type="date" value={state.examDate ?? ""} onChange={(e) => setState((s) => ({ ...s, examDate: e.target.value || undefined }))} /></label>
-            <label><span className="label">Daily focus goal (hours.min)</span><HoursInput className="input !w-48" minutes={state.dailyGoalMin ?? 240} onChange={(m) => setState((s) => ({ ...s, dailyGoalMin: m || undefined }))} /></label>
+            <label><span className="label">Default daily focus goal (hours.min)</span><HoursInput className="input !w-48" minutes={defaultGoalOn(state, todayISO())} onChange={(m) => { if (m) setState((s) => ({ ...s, goalFrom: { ...s.goalFrom, [todayISO()]: m } })); }} /><span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">Applies from today on; earlier days keep the goal they had. Set a single day's goal (or a rest day) from Focus now on the dashboard.</span></label>
           </div>
         </div>
 

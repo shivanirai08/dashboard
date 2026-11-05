@@ -118,7 +118,10 @@ function mergeStates(local: AppState, remote: AppState, remoteNewer: boolean): A
     const theirs = otherTime.get(t.id) ?? 0;
     return theirs > (t.timeMin ?? 0) ? { ...t, timeMin: theirs } : t;
   });
-  return { ...base, pomodoros, todos };
+  // per-day goal maps are only ever added to, so union them rather than losing the other device's entries
+  const goalByDay = { ...other.goalByDay, ...base.goalByDay };
+  const goalFrom = { ...other.goalFrom, ...base.goalFrom };
+  return { ...base, pomodoros, todos, ...(Object.keys(goalByDay).length ? { goalByDay } : {}), ...(Object.keys(goalFrom).length ? { goalFrom } : {}) };
 }
 
 export type SyncStatus = "off" | "connecting" | "synced" | "saving" | "error";

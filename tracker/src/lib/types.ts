@@ -169,6 +169,10 @@ export type AppState = {
   subjectPoints?: SubjectPoint[];
   /** daily focus goal in minutes */
   dailyGoalMin?: number;
+  /** a single day's own goal in minutes (YYYY-MM-DD -> min); 0 marks a rest day */
+  goalByDay?: Record<string, number>;
+  /** changes to the default goal: the new default applies from that day on, so past days keep theirs */
+  goalFrom?: Record<string, number>;
   /** "End day" presses: day (YYYY-MM-DD) -> when it was ended. Anything after that moment belongs to the next day. */
   dayEnds?: Record<string, string>;
 };

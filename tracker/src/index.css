@@ -17,6 +17,9 @@
 
 html { color-scheme: light; }
 html.dark { color-scheme: dark; }
+/* focus heatmap: muted green ramp, blended by hours studied */
+:root { --heat-l0: .93; --heat-l1: .48; --heat-c0: .085; --heat-c1: .175; --heat-near: oklch(.9 .09 95); --heat-miss: oklch(.79 .1 25); }
+.dark { --heat-l0: .31; --heat-l1: .74; --heat-c0: .07; --heat-c1: .17; --heat-near: oklch(.46 .07 90); --heat-miss: oklch(.45 .1 25); }
 .dark select option { background-color: #121623; color: #e2e8f0; }
 select option { background-color: #fff; color: #0f172a; }
 
