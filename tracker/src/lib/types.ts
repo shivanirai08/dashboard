@@ -71,6 +71,8 @@ export type TaskNote = {
 
 export type TodoItem = {
   id: string;
+  /** last edit, stamped by the store; lets the cloud merge keep the newer copy of a task */
+  updatedAt?: string;
   title: string;
   status: TodoStatus;
   priority?: Priority;
@@ -150,6 +152,8 @@ export type SubjectPoint = {
 };
 
 export type AppState = {
+  /** ids of deleted tasks / mocks / mistakes -> when, so a sync does not bring them back */
+  deleted?: Record<string, string>;
   mocks: MockAttempt[];
   mistakes: Mistake[];
   /** @deprecated always empty; revisions are tasks now */

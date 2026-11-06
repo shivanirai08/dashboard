@@ -15,8 +15,13 @@ import { restoreMultiDayStarts } from "./tasks";
 import type { AppState, Catalog } from "./types";
 
 const KEY = "gate-cs-tracker-v2";
-const ROW = "main";
-const TS_KEY = "gate-cs-tracker-updated-at";
+// The dev server must never write to the real row: a stale dev copy once overwrote two days of
+// progress. Dev gets its own row (seeded from "main", read-only); VITE_SYNC_ROW overrides both.
+const MAIN_ROW = "main";
+const ROW = (import.meta.env.VITE_SYNC_ROW as string | undefined) ?? (import.meta.env.DEV ? "dev" : MAIN_ROW);
+const TABLE = "tracker_state";
+const BASE_KEY = "gate-cs-tracker-synced-at"; // the cloud row's updated_at this device last merged
+const DIRTY_KEY = "gate-cs-tracker-dirty"; // set by a real edit, cleared once that edit is in the cloud
 
 const empty: AppState = { mocks: [], mistakes: [], revisions: [], todos: [], pomodoros: [] };
 
@@ -84,44 +89,107 @@ function load(): AppState {
   }
 }
 
-function persist(state: AppState, ts = new Date().toISOString()) {
+function persist(state: AppState) {
   try {
     localStorage.setItem(KEY, JSON.stringify(state));
-    localStorage.setItem(TS_KEY, ts);
   } catch {
     /* storage unavailable */
   }
 }
 
-const localTs = () => {
+const setBase = (v: string) => {
   try {
-    return localStorage.getItem(TS_KEY) ?? "";
+    localStorage.setItem(BASE_KEY, v);
   } catch {
-    return "";
+    /* storage unavailable */
+  }
+};
+const isDirty = () => {
+  try {
+    return localStorage.getItem(DIRTY_KEY) === "1";
+  } catch {
+    return false;
+  }
+};
+const setDirty = (v: boolean) => {
+  try {
+    if (v) localStorage.setItem(DIRTY_KEY, "1");
+    else localStorage.removeItem(DIRTY_KEY);
+  } catch {
+    /* storage unavailable */
   }
 };
 
+type Item = { id: string; updatedAt?: string };
+
+/** stamp edited todos and leave a tombstone for deleted items, so a merge can tell "deleted" from "never seen" */
+function stamp(prev: AppState, next: AppState): AppState {
+  if (prev === next) return next;
+  const now = new Date().toISOString();
+  const before = new Map(prev.todos.map((t) => [t.id, JSON.stringify(t)]));
+  const todos = next.todos.map((t) => {
+    const was = before.get(t.id);
+    return was === undefined || was === JSON.stringify(t) ? t : { ...t, updatedAt: now };
+  });
+  const alive = new Set<string>([...next.todos, ...next.mocks, ...next.mistakes].map((x) => x.id));
+  const gone = [...prev.todos, ...prev.mocks, ...prev.mistakes].filter((x) => !alive.has(x.id));
+  const deleted = gone.length ? { ...next.deleted, ...Object.fromEntries(gone.map((x) => [x.id, now])) } : next.deleted;
+  return { ...next, todos, ...(deleted ? { deleted } : {}) };
+}
+
+/** union by id; the same id on both sides goes to `pick`; a tombstone newer than the item removes it */
+function mergeItems<T extends Item>(local: T[], remote: T[], deleted: Record<string, string>, pick: (l: T, r: T) => T): T[] {
+  const mine = new Map(local.map((x) => [x.id, x]));
+  const out: T[] = [];
+  const seen = new Set<string>();
+  for (const r of remote) {
+    seen.add(r.id);
+    const l = mine.get(r.id);
+    out.push(l ? pick(l, r) : r);
+  }
+  for (const l of local) if (!seen.has(l.id)) out.push(l);
+  return out.filter((x) => !(x.id in deleted) || (x.updatedAt ?? "") > deleted[x.id]);
+}
+
 /**
- * Combine this device's state with the cloud copy. Whole-state "newest wins" used to throw away
- * whatever the other side had logged, so devices drifted apart. Focus sessions are append-only,
- * so they are unioned by id (totals and streaks then agree everywhere); everything else follows
- * the newer side, keeping the larger per-task time so a merged task never loses logged minutes.
+ * Combine this device's state with the cloud copy, item by item (never "whole state, newest wins").
+ * - No unsynced edits here: the cloud copy is adopted, so a stale tab can never overwrite newer work.
+ * - Unsynced edits: each task / mock / mistake is merged by id, the more recently edited task wins,
+ *   deletions are honoured through tombstones, and logged minutes never go down.
+ * Focus sessions are append-only, so they are unioned by id everywhere.
  */
-function mergeStates(local: AppState, remote: AppState, remoteNewer: boolean): AppState {
-  const [base, other] = remoteNewer ? [remote, local] : [local, remote];
+function mergeStates(local: AppState, remote: AppState, localDirty: boolean): AppState {
   const seen = new Set<string>();
   const pomodoros = [...local.pomodoros, ...remote.pomodoros]
     .filter((p) => (seen.has(p.id) ? false : (seen.add(p.id), true)))
     .sort((a, b) => b.startedAt.localeCompare(a.startedAt));
-  const otherTime = new Map(other.todos.map((t) => [t.id, t.timeMin ?? 0]));
-  const todos = base.todos.map((t) => {
-    const theirs = otherTime.get(t.id) ?? 0;
-    return theirs > (t.timeMin ?? 0) ? { ...t, timeMin: theirs } : t;
+  if (!localDirty) return { ...remote, pomodoros };
+
+  const deleted: Record<string, string> = { ...remote.deleted };
+  for (const [id, ts] of Object.entries(local.deleted ?? {})) if (ts > (deleted[id] ?? "")) deleted[id] = ts;
+  const time = (t: AppState["todos"][number]) => t.timeMin ?? 0;
+  const todos = mergeItems(local.todos, remote.todos, deleted, (l, r) => {
+    const win = (l.updatedAt ?? "") > (r.updatedAt ?? "") ? l : r; // tie: the cloud copy
+    const other = win === l ? r : l;
+    return time(other) > time(win) ? { ...win, timeMin: time(other) } : win;
   });
+  const mine = <T,>(l: T) => l; // an edited mock / mistake here is the newer one
+  const mocks = mergeItems<AppState["mocks"][number]>(local.mocks, remote.mocks, deleted, mine);
+  const mistakes = mergeItems<AppState["mistakes"][number]>(local.mistakes, remote.mistakes, deleted, mine);
   // per-day goal maps are only ever added to, so union them rather than losing the other device's entries
-  const goalByDay = { ...other.goalByDay, ...base.goalByDay };
-  const goalFrom = { ...other.goalFrom, ...base.goalFrom };
-  return { ...base, pomodoros, todos, ...(Object.keys(goalByDay).length ? { goalByDay } : {}), ...(Object.keys(goalFrom).length ? { goalFrom } : {}) };
+  const goalByDay = { ...remote.goalByDay, ...local.goalByDay };
+  const goalFrom = { ...remote.goalFrom, ...local.goalFrom };
+  return {
+    ...remote,
+    ...local,
+    todos,
+    mocks,
+    mistakes,
+    pomodoros,
+    ...(Object.keys(deleted).length ? { deleted } : {}),
+    ...(Object.keys(goalByDay).length ? { goalByDay } : {}),
+    ...(Object.keys(goalFrom).length ? { goalFrom } : {}),
+  };
 }
 
 export type SyncStatus = "off" | "connecting" | "synced" | "saving" | "error";
@@ -150,38 +218,87 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     stateRef.current = state;
   }, [state]);
 
-  // pull the cloud copy and merge it in; resolves to the merged state (null if the pull failed)
-  const pullMerge = useCallback(async (): Promise<AppState | null> => {
+  const editSeq = useRef(0); // bumped by every real edit, so an edit made during a push stays flagged
+  const backedUpDay = useRef("");
+
+  // pull the cloud copy and merge it in. Resolves to the merged state plus what the cloud held
+  // (null if the pull failed). Dev with no row of its own starts from a read-only copy of "main".
+  const pullMerge = useCallback(async () => {
     if (!supabase) return null;
-    const { data, error } = await supabase.from("tracker_state").select("data, updated_at").eq("id", ROW).maybeSingle();
+    let { data, error } = await supabase.from(TABLE).select("data, updated_at").eq("id", ROW).maybeSingle();
     if (error) {
       setSync({ status: "error", error: error.message });
       return null;
     }
-    if (!data) return stateRef.current;
-    const remote = normalize(data.data as AppState);
-    const remoteNewer = data.updated_at > localTs();
-    const merged = mergeStates(stateRef.current, remote, remoteNewer);
-    if (JSON.stringify(merged) !== JSON.stringify(stateRef.current)) {
-      persist(merged, remoteNewer ? data.updated_at : undefined);
-      stateRef.current = merged;
-      setStateRaw((prev) => mergeStates(prev, remote, remoteNewer));
+    const existed = Boolean(data);
+    if (!data && ROW !== MAIN_ROW) {
+      ({ data } = await supabase.from(TABLE).select("data, updated_at").eq("id", MAIN_ROW).maybeSingle());
     }
-    return merged;
+    if (!data) return { merged: stateRef.current, base: null as string | null, existed, raw: null as AppState | null };
+    const remote = normalize(data.data as AppState);
+    const dirty = isDirty() || !existed; // a brand-new row has to receive this device's copy
+    const merged = mergeStates(stateRef.current, remote, dirty);
+    if (JSON.stringify(merged) !== JSON.stringify(stateRef.current)) {
+      persist(merged);
+      stateRef.current = merged;
+      setStateRaw((prev) => mergeStates(prev, remote, dirty));
+    }
+    if (existed) setBase(data.updated_at);
+    return { merged, base: existed ? (data.updated_at as string) : null, existed, raw: data.data as AppState };
   }, []);
+
+  // push only unsynced edits, and only if nobody wrote since our last pull (compare-and-swap on
+  // updated_at); on a lost race re-pull, merge and retry, so no device ever overwrites another's work
+  const flush = useCallback(async () => {
+    if (!supabase || !ready.current || !isDirty()) return;
+    const sb = supabase;
+    const seq = editSeq.current;
+    setSync((s) => (s.status === "error" ? s : { status: "saving" }));
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const pulled = await pullMerge();
+      if (!pulled) return;
+      const ts = new Date().toISOString();
+      const day = ts.slice(0, 10);
+      if (pulled.existed && pulled.raw && backedUpDay.current !== day) {
+        // one cloud snapshot per day, taken before the first overwrite of that day
+        await sb.from(TABLE).upsert({ id: `${ROW}-backup-${day}`, data: pulled.raw, updated_at: ts }, { onConflict: "id", ignoreDuplicates: true });
+        backedUpDay.current = day;
+      }
+      const res = pulled.base
+        ? await sb.from(TABLE).update({ data: pulled.merged, updated_at: ts }).eq("id", ROW).eq("updated_at", pulled.base).select("updated_at")
+        : await sb.from(TABLE).insert({ id: ROW, data: pulled.merged, updated_at: ts }).select("updated_at");
+      if (res.error && res.error.code !== "23505") {
+        setSync({ status: "error", error: res.error.message });
+        return;
+      }
+      if (!res.error && res.data?.length) {
+        setBase(res.data[0].updated_at as string);
+        if (editSeq.current === seq) {
+          setDirty(false);
+          persist(pulled.merged);
+        }
+        setSync({ status: "synced" });
+        return;
+      }
+      // someone else wrote in between: loop pulls their copy and merges again
+    }
+    setSync({ status: "error", error: "Sync kept conflicting; will retry on the next change." });
+  }, [pullMerge]);
 
   // pull on load, then again whenever the app comes back to the foreground or the network returns,
   // so a device that sat open (or offline) for days catches up
   useEffect(() => {
     if (!supabase) return;
-    void pullMerge().then((merged) => {
-      if (!merged) return;
+    void pullMerge().then((pulled) => {
+      if (!pulled) return;
       ready.current = true;
       setSync({ status: "synced" });
-      setStateRaw((s) => ({ ...s })); // first push when local was newer / remote empty
+      if (!pulled.existed) setDirty(true);
+      if (isDirty()) void flush();
     });
     const refresh = () => {
-      if (ready.current && document.visibilityState === "visible") void pullMerge();
+      if (!ready.current || document.visibilityState !== "visible") return;
+      void (isDirty() ? flush() : pullMerge());
     };
     document.addEventListener("visibilitychange", refresh);
     window.addEventListener("focus", refresh);
@@ -191,30 +308,22 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       window.removeEventListener("focus", refresh);
       window.removeEventListener("online", refresh);
     };
-  }, [pullMerge]);
+  }, [pullMerge, flush]);
 
-  // debounced push: merge the latest cloud copy first so another device's changes are never overwritten
+  // debounced push after an edit (a pull alone never changes `state` into something worth pushing)
   useEffect(() => {
-    if (!supabase || !ready.current) return;
-    const sb = supabase;
-    setSync((s) => (s.status === "error" ? s : { status: "saving" }));
-    const t = window.setTimeout(async () => {
-      const merged = await pullMerge();
-      if (!merged) return;
-      const ts = new Date().toISOString();
-      const { error } = await sb.from("tracker_state").upsert({ id: ROW, data: merged, updated_at: ts });
-      if (error) setSync({ status: "error", error: error.message });
-      else {
-        persist(merged, ts);
-        setSync({ status: "synced" });
-      }
-    }, 800);
+    if (!supabase || !ready.current || !isDirty()) return;
+    const t = window.setTimeout(() => void flush(), 800);
     return () => window.clearTimeout(t);
-  }, [state, pullMerge]);
+  }, [state, flush]);
 
   const setState = useCallback((updater: (prev: AppState) => AppState) => {
     setStateRaw((prev) => {
-      const next = updater(prev);
+      const next = stamp(prev, updater(prev));
+      if (next !== prev) {
+        editSeq.current++;
+        setDirty(true);
+      }
       persist(next);
       return next;
     });
